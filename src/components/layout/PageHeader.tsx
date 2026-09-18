@@ -66,7 +66,7 @@ export function PageHeader({
             {status}
           </div>
           {description && (
-            <p className="mt-xxs max-w-3xl text-body-sm text-text-secondary">{description}</p>
+            <p className="mt-xxs max-w-copy text-body-sm text-text-secondary">{description}</p>
           )}
           {facts.length > 0 && (
             <p className="mt-xs flex flex-wrap items-center gap-x-sm gap-y-xxs text-body-sm text-text-secondary">

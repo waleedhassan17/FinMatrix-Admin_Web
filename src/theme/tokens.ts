@@ -327,6 +327,28 @@ export const spacing = {
 } as const;
 
 // ───────────────────────────────────────────────
+// 6b. Measures (max widths), in px
+// ───────────────────────────────────────────────
+// Web-only: the app sizes to the device, so these have no React Native twin.
+//
+// They are named for the thing they size rather than by t-shirt size because
+// Tailwind resolves a max-width against --spacing BEFORE --container: with a
+// t-shirt spacing scale, the `sm` max-width silently means 12px. A name outside
+// that range is the only way a measure survives. See the note in index.css.
+export const measure = {
+  /** A single column of fields — the sign-in form. */
+  form: 384,
+  /** A standalone centred card: 404, route error. */
+  card: 448,
+  /** A full-page empty or error state. */
+  panel: 576,
+  /** A modal's body. */
+  dialog: 672,
+  /** A readable line length for running text. */
+  copy: 768,
+} as const;
+
+// ───────────────────────────────────────────────
 // 7. Form-control tokens
 // ───────────────────────────────────────────────
 // THE single source for form-control metrics. Every form primitive reads
@@ -422,6 +444,7 @@ export const THEME = {
   radius,
   shadows,
   spacing,
+  measure,
   form,
 } as const;
 

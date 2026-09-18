@@ -42,7 +42,7 @@ function RouteError() {
   reportError(error, { boundary: 'route' });
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-lg">
-      <div className="w-full max-w-sm rounded-lg bg-surface p-xl text-center shadow-card">
+      <div className="w-full max-w-form rounded-lg bg-surface p-xl text-center shadow-card">
         <h1 className="text-h3 text-text-primary">Something went wrong</h1>
         <p className="mt-xs text-body-sm text-text-secondary">
           The page could not be loaded.

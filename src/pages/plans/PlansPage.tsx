@@ -16,6 +16,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { resolvePlanFeatures } from '@/models/planFeatures';
 import type { SubscriptionPlan } from '@/models/platform';
 import { getSubscriptionPlans } from '@/networks/superAdmin/platformNetwork';
+import { formatMoney } from '@/utils/money';
 
 export function PlansPage() {
   const { data, isLoading, isError, error } = useQuery({
@@ -93,8 +94,12 @@ function PlanCard({ plan }: { plan: SubscriptionPlan }) {
       </div>
 
       <div className="mt-md flex items-baseline gap-xs">
+        {/* totalLabel is the server's own formatted string. Both label fields
+            are optional, and priceMonthly is a raw DECIMAL string — rendering
+            it as-is prints a bare "4500" beside the "Rs 139,500.00" figures on
+            every other page. formatMoney is the one formatter. */}
         <span className="text-h2 text-text-primary tabular">
-          {plan.totalLabel ?? plan.priceMonthly}
+          {plan.totalLabel ?? formatMoney(plan.priceMonthly)}
         </span>
         {plan.monthlyLabel && (
           <span className="text-body-sm text-text-secondary">
@@ -105,11 +110,16 @@ function PlanCard({ plan }: { plan: SubscriptionPlan }) {
 
       {(plan.durationMonths || plan.deliveryPersonnelLimit !== undefined) && (
         <p className="mt-xxs flex flex-wrap items-center gap-x-sm gap-y-xxs text-caption text-text-tertiary">
-          {plan.durationMonths ? <span>{plan.durationMonths} months</span> : null}
+          {plan.durationMonths ? (
+            <span>
+              {plan.durationMonths} {plan.durationMonths === 1 ? 'month' : 'months'}
+            </span>
+          ) : null}
           {plan.deliveryPersonnelLimit !== undefined && (
             <span className="inline-flex items-center gap-xxs">
               <Users className="size-3" aria-hidden="true" />
-              {plan.deliveryPersonnelLimit} riders
+              {plan.deliveryPersonnelLimit}{' '}
+              {plan.deliveryPersonnelLimit === 1 ? 'rider' : 'riders'}
             </span>
           )}
         </p>

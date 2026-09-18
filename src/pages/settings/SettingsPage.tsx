@@ -49,7 +49,7 @@ export function SettingsPage() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-lg">
+    <div className="mx-auto flex w-full max-w-copy flex-col gap-lg">
       <PageHeader
         title="Console settings"
         description="Your account, and what this console tells you about."

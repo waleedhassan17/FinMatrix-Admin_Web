@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/Card';
 export function NotFoundPage() {
   const { pathname } = useLocation();
   return (
-    <Card className="mx-auto max-w-md p-xxl text-center">
+    <Card className="mx-auto max-w-card p-xxl text-center">
       <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary-tint text-primary">
         <Compass className="size-5" aria-hidden="true" />
       </span>

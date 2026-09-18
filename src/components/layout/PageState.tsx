@@ -64,7 +64,7 @@ export function PageMessage({
 }) {
   const Icon = tone === 'error' ? AlertTriangle : FileQuestion;
   return (
-    <Card className="mx-auto flex w-full max-w-[36rem] flex-col items-center px-xl py-xxxl text-center">
+    <Card className="mx-auto flex w-full max-w-panel flex-col items-center px-xl py-xxxl text-center">
       <span
         className={
           tone === 'error'

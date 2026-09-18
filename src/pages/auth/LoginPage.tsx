@@ -65,7 +65,7 @@ export function LoginPage() {
           </span>
           <span className="text-h4">FinMatrix Admin</span>
         </div>
-        <div className="max-w-md">
+        <div className="max-w-card">
           <h1 className="text-display-sm">The platform console</h1>
           <p className="mt-sm text-body-md text-white/70">
             Approve companies, review payment submissions and watch revenue
@@ -78,7 +78,7 @@ export function LoginPage() {
       </div>
 
       <div className="flex flex-1 items-center justify-center bg-background p-lg">
-        <form onSubmit={submit} className="w-full max-w-sm">
+        <form onSubmit={submit} className="w-full max-w-form">
           <div className="mb-xl lg:hidden">
             <span className="flex size-10 items-center justify-center rounded-lg bg-primary-tint text-primary">
               <ShieldCheck className="size-5" aria-hidden="true" />

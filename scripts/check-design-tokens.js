@@ -68,6 +68,22 @@ const RULES = [
     re: /fontFamily:\s*['"][^'"]+['"]/g,
     msg: 'hardcoded fontFamily — use FONT_STACK or the font-sans utility',
   },
+  {
+    // The one that actually shipped broken. Tailwind resolves a width or height
+    // utility against --max-width, then --spacing, then --container — spacing
+    // BEFORE container. Our spacing scale is t-shirt sized, so `max-w-sm` is
+    // not 24rem, it is `var(--spacing-sm)` = 12px, and no build step complains:
+    // the class exists, the CSS is valid, the sign-in form is 12px wide.
+    //
+    // The whole t-shirt range is therefore unusable as a width. Sizes come from
+    // the `measure` scale (max-w-form, -card, -panel, -dialog, -copy), which is
+    // named outside that range precisely so it cannot collide.
+    re: /\b(?:max-w|min-w|w|max-h|min-h|h|basis)-(?:3xs|2xs|xs|sm|md|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|xxs|xxl|xxxl|xxxxl)\b/g,
+    msg:
+      't-shirt size on a width/height utility — it silently resolves to the ' +
+      'spacing scale (max-w-sm = 12px). Use a measure token: max-w-form, ' +
+      'max-w-card, max-w-panel, max-w-dialog, max-w-copy.',
+  },
 ];
 
 function walk(dir, out = []) {
@@ -82,7 +98,72 @@ function walk(dir, out = []) {
   return out;
 }
 
+/**
+ * The CSS half of the measure invariant.
+ *
+ * tokens.ts declares `measure` and index.css projects it as --container-*. The
+ * names must not also exist under --spacing-*, because Tailwind reads spacing
+ * first and a shadowed measure silently becomes a padding value — `max-w-form`
+ * would resolve to 4px as readily as `max-w-sm` resolves to 12px.
+ *
+ * Checked here rather than in a vitest suite because Vite stubs CSS imports in
+ * the node test environment: `import css from './index.css?raw'` hands back an
+ * empty string, and every assertion over it passes without reading anything.
+ */
+function checkMeasureScale(findings) {
+  const cssPath = 'src/index.css';
+  const tokensPath = 'src/theme/tokens.ts';
+  if (!fs.existsSync(cssPath) || !fs.existsSync(tokensPath)) return;
+
+  const css = fs.readFileSync(cssPath, 'utf8');
+  const names = (ns) =>
+    new Set(
+      [...css.matchAll(new RegExp(`^\\s*--${ns}-([a-z0-9-]+):`, 'gm'))].map(
+        (m) => m[1],
+      ),
+    );
+  const containers = names('container');
+  const spacings = names('spacing');
+
+  for (const name of containers) {
+    if (spacings.has(name)) {
+      findings.push({
+        file: cssPath,
+        line: css.split('\n').findIndex((l) => l.includes(`--container-${name}:`)) + 1,
+        msg: `--container-${name} is shadowed by --spacing-${name} — Tailwind reads spacing first, so max-w-${name} silently becomes the spacing value`,
+        text: `--container-${name}`,
+      });
+    }
+  }
+
+  // tokens.ts is the source of truth; index.css is its projection. Drift here
+  // means TypeScript and the stylesheet disagree about how wide something is.
+  const block = /export const measure = \{([\s\S]*?)\n\} as const;/.exec(
+    fs.readFileSync(tokensPath, 'utf8'),
+  );
+  if (!block) return;
+  for (const [, key, px] of block[1].matchAll(/^\s*([a-z][a-zA-Z0-9]*):\s*(\d+),/gm)) {
+    const declared = new RegExp(`^\\s*--container-${key}:\\s*([\\d.]+)rem;`, 'm').exec(css);
+    if (!declared) {
+      findings.push({
+        file: tokensPath,
+        line: 0,
+        msg: `measure.${key} has no --container-${key} in ${cssPath}`,
+        text: `${key}: ${px}`,
+      });
+    } else if (Number(declared[1]) * 16 !== Number(px)) {
+      findings.push({
+        file: cssPath,
+        line: 0,
+        msg: `--container-${key} is ${Number(declared[1]) * 16}px but measure.${key} is ${px}px`,
+        text: `--container-${key}: ${declared[1]}rem`,
+      });
+    }
+  }
+}
+
 const findings = [];
+checkMeasureScale(findings);
 for (const root of ROOTS) {
   if (!fs.existsSync(root)) continue;
   for (const file of walk(root)) {

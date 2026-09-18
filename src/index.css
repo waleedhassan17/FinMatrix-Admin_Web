@@ -1,4 +1,13 @@
-@import 'tailwindcss';
+@import 'tailwindcss' source(none);
+
+/* Only the app's own modules and the shell are scanned for class names.
+   Automatic detection walks everything not in .gitignore, which here means the
+   README and scripts/check-design-tokens.js — and that script necessarily spells
+   out the broken class names it bans, so auto-detection emits CSS for exactly
+   the utilities the gate exists to forbid. Listing the sources keeps the output
+   a function of the app alone. */
+@source '../index.html';
+@source './**/*.{ts,tsx}';
 
 /* Roboto — the face the app renders on Android, which is the build users have.
    Latin subset only: the unscoped entrypoints pull cyrillic, greek, math and
@@ -251,6 +260,25 @@
      not a page section's — marketing sections need 88–120px to breathe. */
   --spacing-section: 88px;
   --spacing-section-lg: 120px;
+
+  /* ── Measures (max widths) ────────────────────────────
+     Tailwind resolves a width utility against --max-width, then --spacing, then
+     --container — spacing FIRST. So with the t-shirt spacing scale above, a
+     max-width named for a t-shirt size lands on spacing: the `sm` one is 12px
+     rather than 24rem, which is what collapsed the sign-in form to a sliver.
+     The whole t-shirt range (xs…xxxxl) is spoken for and unusable as a measure.
+
+     Two further names are already taken by Tailwind's own static utilities and
+     would be ignored here: `prose` (65ch) and `screen`.
+
+     These are named for the thing they size instead, so they can collide with
+     neither — and they say what they are at the call site. Mirrored in
+     tokens.ts as `measure`. */
+  --container-form: 24rem; /* a single column of fields */
+  --container-card: 28rem; /* a standalone centred card: 404, confirm, route error */
+  --container-panel: 36rem; /* a full-page empty or error state */
+  --container-dialog: 42rem; /* a modal's body */
+  --container-copy: 48rem; /* a readable line length for running text */
 
   /* ── Motion ─────────────────────────────────────────── */
   --animate-float: float 7s ease-in-out infinite;

@@ -92,7 +92,18 @@ you are synchronously, during render, which a query cannot do.
    label back by one and looks entirely plausible. `models/revenue.ts` owns this
    and has the test.
 3. **Every amount is in minor units (paisa).** Divide by 100. Prefer the
-   server's pre-formatted `*Label` strings where they exist.
+   server's pre-formatted `*Label` strings where they exist — but fall back to
+   `formatMoney`, never to the raw field: `priceMonthly` is a DECIMAL string and
+   prints as a bare `4500` next to the `Rs 139,500.00` on every other page.
+4. **A width may not be named for a t-shirt size.** Tailwind resolves `max-w-*`
+   against `--max-width`, then `--spacing`, then `--container` — spacing
+   *first*. Our spacing scale is `xs…xxxxl`, so `max-w-sm` does not mean 24rem,
+   it means `var(--spacing-sm)` — 12px. Nothing errors: the class exists and the
+   CSS is valid, so the sign-in form simply renders 12px wide. Widths come from
+   the `measure` scale instead — `max-w-form`, `-card`, `-panel`, `-dialog`,
+   `-copy` — whose names sit outside the spacing range and outside Tailwind's
+   own static utilities (`prose` is already taken, at 65ch). `check:tokens`
+   fails the build on a t-shirt-sized width or height.
 
 ## Checks
 
@@ -103,8 +114,34 @@ npm run lint          # oxlint
 
 `check:tokens` is a hard gate: no hex literals, no `text-[14px]`, no
 `fontSize`/`fontWeight`/`fontFamily` outside `theme/tokens.ts` and
-`theme/status.ts`. Charts satisfy it by reading `colors.*` and
-`typography.caption.fontSize` from the tokens.
+`theme/status.ts`, and no t-shirt-sized width or height (see bite 4). Charts
+satisfy it by reading `colors.*` and `typography.caption.fontSize` from the
+tokens.
+
+## Deploying
+
+Vercel, from `vercel.json`:
+
+- **SPA rewrite** — everything that is not a real file falls through to
+  `index.html`. `/assets/` is excluded, so a chunk deleted by a later deploy
+  404s instead of being served `index.html` with a JavaScript content type.
+  `lazyWithReload` turns that 404 into one reload rather than an error screen.
+- **Caching** — hashed assets `immutable` for a year; `index.html` always
+  revalidated, which is what makes a deploy visible to an open tab.
+- **Security headers** — `X-Frame-Options: DENY` and CSP `frame-ancestors
+  'none'` (a console whose buttons settle real payments must not be
+  frameable), plus `nosniff`, `Referrer-Policy: no-referrer`, a
+  `Permissions-Policy` denying camera/mic/geolocation/payment/USB, and HSTS.
+
+  There is deliberately **no full CSP**. A useful one needs `connect-src` to
+  name the API origin, and that origin is a build-time variable
+  (`VITE_API_URL`) while `vercel.json` is static — so a `default-src` policy
+  committed here would silently break every request the day the API moves.
+  Adding one means generating it per environment, not hardcoding it.
+
+Environment variables are in `.env.example`; set `VITE_SENTRY_DSN` in the
+Vercel project settings to turn error reporting on (without it the SDK is never
+downloaded).
 
 ## Not built yet
 
@@ -129,4 +166,3 @@ Three things were fixed rather than inherited:
 - localStorage keys are `@finmatrix-admin/*`. On `localhost` the origin is the
   port and localStorage is **not** partitioned by it, so sharing `@finmatrix/*`
   would let the two apps read each other's session in development.
-# FinMatrix-Admin_Web

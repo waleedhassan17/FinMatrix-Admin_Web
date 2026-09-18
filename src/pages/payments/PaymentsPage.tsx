@@ -466,7 +466,7 @@ function ScreenshotDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--color-overlay)] p-lg">
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-lg bg-surface shadow-lg">
+      <div className="flex max-h-[90vh] w-full max-w-dialog flex-col rounded-lg bg-surface shadow-lg">
         <div className="flex items-center justify-between border-b border-border-light px-lg py-md">
           <div className="min-w-0">
             <p className="truncate text-h4 text-text-primary">
