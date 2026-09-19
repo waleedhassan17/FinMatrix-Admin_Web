@@ -14,6 +14,7 @@ import {
 } from '@/features/auth/SessionGate';
 import { AppLayout } from '@/features/shell/AppLayout';
 import { reportError } from '@/app/observability';
+import { Spinner } from '@/components/ui/Spinner';
 
 import {
   AnalyticsPage,
@@ -32,7 +33,7 @@ function RouteFallback() {
       className="flex min-h-screen items-center justify-center bg-background"
       aria-busy="true"
     >
-      <div className="size-8 animate-spin rounded-full border-2 border-border border-t-primary" />
+      <Spinner />
     </div>
   );
 }

@@ -20,6 +20,7 @@ import { selectAuthStatus } from '@/store/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/store';
 import { setSessionExpiredHandler } from '@/utils/authEvents';
 import { clearTokens, hasSession } from '@/utils/storage';
+import { Spinner } from '@/components/ui/Spinner';
 
 function BootSplash() {
   return (
@@ -28,7 +29,7 @@ function BootSplash() {
       aria-busy="true"
     >
       <div className="flex flex-col items-center gap-md">
-        <div className="size-8 animate-spin rounded-full border-2 border-border border-t-primary" />
+        <Spinner />
         <p className="text-body-sm text-text-secondary">Loading the console…</p>
       </div>
     </div>

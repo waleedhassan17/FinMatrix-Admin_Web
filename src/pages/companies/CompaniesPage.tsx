@@ -20,7 +20,9 @@ import { DataTable, TablePager } from '@/components/ui/DataTable';
 import { Textarea } from '@/components/ui/Field';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useSettle } from '@/features/platform/invalidation';
-import { cn } from '@/lib/cn';
+import { ErrorBanner } from '@/components/layout/PageState';
+import { formatDate } from '@/utils/date';
+import { Chip } from '@/components/ui/Chip';
 import {
   COMPANY_FILTERS,
   isCompanyFilter,
@@ -36,17 +38,6 @@ import {
 
 const PAGE_SIZE = 20;
 
-const dateOf = (iso: string | null): string => {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-};
 
 type Decision = { company: CompanyListItem; action: 'approve' | 'reject' };
 
@@ -73,7 +64,7 @@ export function CompaniesPage() {
     setParams(q);
   };
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['companies', 'list', { filter, page }],
     queryFn: () =>
       getCompanies({
@@ -157,7 +148,7 @@ export function CompaniesPage() {
         header: 'Registered',
         accessorKey: 'createdAt',
         cell: ({ row }: { row: { original: CompanyListItem } }) =>
-          dateOf(row.original.createdAt),
+          formatDate(row.original.createdAt),
       },
       {
         header: '',
@@ -204,11 +195,11 @@ export function CompaniesPage() {
       />
 
       {isError && (
-        <div role="alert" className="rounded-md bg-danger-lighter p-sm">
-          <p className="text-body-sm text-danger">
-            {(error as Error)?.message ?? 'Could not load companies.'}
-          </p>
-        </div>
+        <ErrorBanner
+          error={error}
+          fallback="Could not load companies."
+          onRetry={refetch}
+        />
       )}
 
       <div>
@@ -226,19 +217,13 @@ export function CompaniesPage() {
           toolbar={
             <div className="flex flex-wrap items-center gap-sm border-b border-border-light p-md">
               {COMPANY_FILTERS.map((f) => (
-                <button
+                <Chip
                   key={f.value}
-                  type="button"
+                  active={filter === f.value}
                   onClick={() => setFilter(f.value)}
-                  className={cn(
-                    'rounded-full px-sm py-xxs text-label-md transition-colors',
-                    filter === f.value
-                      ? 'bg-primary text-text-inverse'
-                      : 'bg-neutral-100 text-text-secondary hover:bg-neutral-200',
-                  )}
                 >
                   {f.label}
-                </button>
+                </Chip>
               ))}
             </div>
           }
@@ -280,19 +265,9 @@ export function CompaniesPage() {
         <div className="flex flex-col gap-sm">
           <div className="flex flex-wrap gap-xs">
             {REJECT_REASONS.map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setReason(r)}
-                className={cn(
-                  'rounded-full px-sm py-xxs text-label-sm transition-colors',
-                  reason === r
-                    ? 'bg-primary text-text-inverse'
-                    : 'bg-neutral-100 text-text-secondary hover:bg-neutral-200',
-                )}
-              >
+              <Chip key={r} active={reason === r} size="sm" onClick={() => setReason(r)}>
                 {r}
-              </button>
+              </Chip>
             ))}
           </div>
           {/* Page-managed rather than ConfirmDialog's built-in `reason` slot:

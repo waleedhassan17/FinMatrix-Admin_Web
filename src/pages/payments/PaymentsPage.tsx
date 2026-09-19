@@ -29,6 +29,10 @@ import { Textarea } from '@/components/ui/Field';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useSettle } from '@/features/platform/invalidation';
+import { ErrorBanner } from '@/components/layout/PageState';
+import { Chip } from '@/components/ui/Chip';
+import { Dialog } from '@/components/ui/Dialog';
+import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/lib/cn';
 import {
   hasViewableScreenshot,
@@ -84,7 +88,7 @@ export function PaymentsPage() {
     setParams(q);
   };
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['submissions', 'list', { status, kind }],
     queryFn: () =>
       listPaymentSubmissions({
@@ -168,11 +172,11 @@ export function PaymentsPage() {
       </div>
 
       {isError && (
-        <div role="alert" className="rounded-md bg-danger-lighter p-sm">
-          <p className="text-body-sm text-danger">
-            {(error as Error)?.message ?? 'Could not load the queue.'}
-          </p>
-        </div>
+        <ErrorBanner
+          error={error}
+          fallback="Could not load the queue."
+          onRetry={refetch}
+        />
       )}
 
       {isLoading ? (
@@ -288,30 +292,6 @@ export function PaymentsPage() {
   );
 }
 
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'rounded-full px-sm py-xxs text-label-md transition-colors',
-        active
-          ? 'bg-primary text-text-inverse'
-          : 'bg-neutral-100 text-text-secondary hover:bg-neutral-200',
-      )}
-    >
-      {children}
-    </button>
-  );
-}
 
 function SubmissionRow({
   submission: s,
@@ -462,36 +442,33 @@ function ScreenshotDialog({
   }, [submission.id]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--color-overlay)] p-lg">
-      <div className="flex max-h-[90vh] w-full max-w-dialog flex-col rounded-lg bg-surface shadow-lg">
-        <div className="flex items-center justify-between border-b border-border-light px-lg py-md">
-          <div className="min-w-0">
-            <p className="truncate text-h4 text-text-primary">
-              {submission.companyName ?? 'Transfer screenshot'}
-            </p>
-            <p className="text-body-sm text-text-secondary">
-              {submission.planLabel} · {submission.amountLabel}
-            </p>
-          </div>
-          <Button variant="secondary" size="sm" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-        <div className="flex min-h-64 items-center justify-center overflow-auto p-lg">
-          {failed ? (
-            <p className="text-body-sm text-danger">{failed}</p>
-          ) : url ? (
-            <img
-              src={url}
-              alt={`Transfer screenshot for ${submission.companyName ?? 'this submission'}`}
-              className="max-h-[70vh] w-auto rounded-md"
-            />
-          ) : (
-            <div className="size-8 animate-spin rounded-full border-2 border-border border-t-primary" />
-          )}
-        </div>
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title={submission.companyName ?? 'Transfer screenshot'}
+      description={`${submission.planLabel} · ${submission.amountLabel}`}
+      footer={
+        <Button variant="secondary" size="sm" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      <div className="flex min-h-64 items-center justify-center p-lg">
+        {failed ? (
+          <p className="text-body-sm text-danger">{failed}</p>
+        ) : url ? (
+          <img
+            src={url}
+            alt={`Transfer screenshot for ${submission.companyName ?? 'this submission'}`}
+            className="max-h-[70vh] w-auto rounded-md"
+          />
+        ) : (
+          <Spinner />
+        )}
       </div>
-    </div>
+    </Dialog>
   );
 }
 

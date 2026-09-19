@@ -13,13 +13,14 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { ErrorBanner } from '@/components/layout/PageState';
 import { resolvePlanFeatures } from '@/models/planFeatures';
 import type { SubscriptionPlan } from '@/models/platform';
 import { getSubscriptionPlans } from '@/networks/superAdmin/platformNetwork';
 import { formatMoney } from '@/utils/money';
 
 export function PlansPage() {
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['plans', 'list'],
     queryFn: getSubscriptionPlans,
   });
@@ -43,11 +44,11 @@ export function PlansPage() {
       </div>
 
       {isError && (
-        <div role="alert" className="rounded-md bg-danger-lighter p-sm">
-          <p className="text-body-sm text-danger">
-            {(error as Error)?.message ?? 'Could not load plans.'}
-          </p>
-        </div>
+        <ErrorBanner
+          error={error}
+          fallback="Could not load plans."
+          onRetry={refetch}
+        />
       )}
 
       {isLoading ? (

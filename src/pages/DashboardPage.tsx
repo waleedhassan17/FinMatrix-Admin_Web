@@ -18,21 +18,13 @@ import { Card } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
 import { StatTile } from '@/components/ui/StatTile';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { ErrorBanner } from '@/components/layout/PageState';
+import { formatDate } from '@/utils/date';
 import { getPlatformStats } from '@/networks/superAdmin/platformNetwork';
 
 /** StatTile takes a pre-formatted string, so the caller owns the unit. */
 const count = (n: number | undefined): string => (n ?? 0).toLocaleString('en-US');
 
-const dateOf = (iso: string): string => {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-};
 
 type Registration = {
   id: string;
@@ -44,7 +36,7 @@ type Registration = {
 };
 
 export function DashboardPage() {
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['platform', 'stats'],
     queryFn: getPlatformStats,
   });
@@ -60,11 +52,11 @@ export function DashboardPage() {
       />
 
       {isError && (
-        <div role="alert" className="rounded-md bg-danger-lighter p-sm">
-          <p className="text-body-sm text-danger">
-            {(error as Error)?.message ?? 'Could not load platform statistics.'}
-          </p>
-        </div>
+        <ErrorBanner
+          error={error}
+          fallback="Could not load platform statistics."
+          onRetry={refetch}
+        />
       )}
 
       <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
@@ -165,7 +157,7 @@ export function DashboardPage() {
             {
               header: 'Registered',
               accessorKey: 'createdAt',
-              cell: ({ row }) => dateOf(row.original.createdAt),
+              cell: ({ row }) => formatDate(row.original.createdAt),
             },
           ]}
         />
