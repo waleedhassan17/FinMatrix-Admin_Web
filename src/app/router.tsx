@@ -19,6 +19,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import {
   AnalyticsPage,
   CompaniesPage,
+  CompanyDetailPage,
   DashboardPage,
   LoginPage,
   NotFoundPage,
@@ -92,6 +93,7 @@ export const router = createBrowserRouter([
         children: [
           { path: 'dashboard', element: <DashboardPage /> },
           { path: 'companies', element: <CompaniesPage /> },
+          { path: 'companies/:id', element: <CompanyDetailPage /> },
           { path: 'payments', element: <PaymentsPage /> },
           { path: 'analytics', element: <AnalyticsPage /> },
           { path: 'plans', element: <PlansPage /> },

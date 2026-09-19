@@ -22,6 +22,9 @@ export const DashboardPage = lazyWithReload(
 export const CompaniesPage = lazyWithReload(
   () => import('@/pages/companies/CompaniesPage'),
 );
+export const CompanyDetailPage = lazyWithReload(
+  () => import('@/pages/companies/CompanyDetailPage'),
+);
 export const PaymentsPage = lazyWithReload(
   () => import('@/pages/payments/PaymentsPage'),
 );
