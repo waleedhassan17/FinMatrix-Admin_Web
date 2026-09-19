@@ -127,10 +127,81 @@ export const authSignOut = async (): Promise<void> => {
   }
 };
 
-/** Mail a reset code. Used by Settings' "change password". */
-export const authForgotPassword = async (email: string): Promise<void> => {
+/**
+ * Step 1 of 3: mail a reset code.
+ *
+ * The server can answer `ownerManaged`, meaning this account's password is not
+ * self-service and no code was sent. Announcing "Reset code sent" regardless
+ * sends the admin looking for mail that will never arrive, so the flag comes
+ * back to the caller rather than being swallowed.
+ */
+export interface ForgotPasswordResult {
+  delivered: boolean;
+  ownerManaged?: boolean;
+  message?: string;
+}
+
+export const authForgotPassword = async (
+  email: string,
+): Promise<ForgotPasswordResult> => {
   try {
-    await api.post('/auth/forgot-password', { email: email.trim() });
+    const response = await api.post('/auth/forgot-password', {
+      email: email.trim(),
+    });
+    const body = unwrapEnvelope<Partial<ForgotPasswordResult>>(response.data);
+    return {
+      delivered: body?.delivered ?? true,
+      ownerManaged: body?.ownerManaged,
+      message: body?.message,
+    };
+  } catch (e) {
+    throw toApiError(e);
+  }
+};
+
+/**
+ * Step 2 of 3: trade the emailed code for a reset token.
+ *
+ * The token is short-lived and is the only thing that authorises step 3, so it
+ * stays in component state for the length of the flow and is never persisted.
+ */
+export const authVerifyOtp = async (
+  email: string,
+  otp: string,
+): Promise<string> => {
+  try {
+    const response = await api.post('/auth/verify-otp', {
+      email: email.trim(),
+      otp: otp.trim(),
+    });
+    const body = unwrapEnvelope<{ resetToken?: string }>(response.data);
+    const token = body?.resetToken;
+    if (!token) throw new Error('The server did not return a reset token.');
+    return token;
+  } catch (e) {
+    throw toApiError(e);
+  }
+};
+
+/**
+ * Step 3 of 3: set the new password.
+ *
+ * This one answers `{ success: true }` VERBATIM — the envelope interceptor
+ * passes through any payload already carrying a `success` key, so there is no
+ * `data` to unwrap and no fields to read off the result. A call that does not
+ * throw is the whole signal.
+ */
+export const authResetPassword = async (
+  email: string,
+  resetToken: string,
+  password: string,
+): Promise<void> => {
+  try {
+    await api.post('/auth/reset-password', {
+      email: email.trim(),
+      resetToken,
+      password,
+    });
   } catch (e) {
     throw toApiError(e);
   }

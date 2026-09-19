@@ -16,7 +16,7 @@
 // having: "Rs 0" and a dead "View transfer screenshot" link.
 
 import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ImageIcon, Mail, Phone, User } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -28,6 +28,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Textarea } from '@/components/ui/Field';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { useSettle } from '@/features/platform/invalidation';
 import { cn } from '@/lib/cn';
 import {
   hasViewableScreenshot,
@@ -59,7 +60,7 @@ const KIND_CLASS: Record<string, string> = {
 
 export function PaymentsPage() {
   const [params, setParams] = useSearchParams();
-  const queryClient = useQueryClient();
+  const { afterSubmissionDecision } = useSettle();
 
   const rawStatus = params.get('status');
   const status: SubmissionStatus = isSubmissionStatus(rawStatus)
@@ -94,11 +95,7 @@ export function PaymentsPage() {
       }),
   });
 
-  const settle = () => {
-    queryClient.invalidateQueries({ queryKey: ['submissions'] });
-    queryClient.invalidateQueries({ queryKey: ['revenue'] });
-    queryClient.invalidateQueries({ queryKey: ['platform'] });
-  };
+  const settle = afterSubmissionDecision;
 
   const approve = useMutation({
     mutationFn: (s: PaymentSubmissionView) => approvePaymentSubmission(s.id),

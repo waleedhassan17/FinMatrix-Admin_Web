@@ -5,6 +5,7 @@
 import {
   api,
   authedBlobUrl,
+  idempotent,
   toApiError,
   unwrapEnvelope,
 } from '@/networks/network/apiHelpers';
@@ -14,6 +15,7 @@ import type {
   SubmissionStatus,
 } from '@/models/submission';
 import type { RevenueSummary } from '@/models/revenue';
+import type { ExpiryScanResult } from '@/models/platform';
 
 export interface SubmissionQueryParams {
   status?: SubmissionStatus;
@@ -53,6 +55,10 @@ export const approvePaymentSubmission = async (
   try {
     const response = await api.patch(
       `/admin/payment-submissions/${id}/approve`,
+      undefined,
+      // Approval records platform revenue, reconciles rider seats and emails
+      // the owner. A double-tap on a slow connection must not do that twice.
+      idempotent(),
     );
     return unwrapEnvelope<PaymentSubmissionView>(response.data);
   } catch (e) {
@@ -74,10 +80,11 @@ export const rejectPaymentSubmission = async (
   blockFutureTrials?: boolean,
 ): Promise<PaymentSubmissionView> => {
   try {
-    const response = await api.patch(`/admin/payment-submissions/${id}/reject`, {
-      reason,
-      ...(blockFutureTrials ? { blockFutureTrials: true } : {}),
-    });
+    const response = await api.patch(
+      `/admin/payment-submissions/${id}/reject`,
+      { reason, ...(blockFutureTrials ? { blockFutureTrials: true } : {}) },
+      idempotent(),
+    );
     return unwrapEnvelope<PaymentSubmissionView>(response.data);
   } catch (e) {
     throw toApiError(e);
@@ -98,6 +105,34 @@ export const rejectPaymentSubmission = async (
 export const getScreenshotUrl = async (id: string): Promise<string> => {
   try {
     return await authedBlobUrl(`/admin/payment-submissions/${id}/screenshot`);
+  } catch (e) {
+    throw toApiError(e);
+  }
+};
+
+/**
+ * Run the expiry sweep now, rather than waiting for the 1 AM cron.
+ *
+ * This is destructive at scale: it deactivates every company whose
+ * subscription has lapsed, marks the ones about to lapse, and sends email to
+ * all of them. Callers confirm first, send an Idempotency-Key so a double-tap
+ * cannot double-send, and show the returned counts so the operator can see
+ * what it actually did.
+ */
+export const runExpiryScan = async (): Promise<ExpiryScanResult> => {
+  try {
+    const response = await api.post(
+      '/admin/payment-submissions/run-expiry-scan',
+      undefined,
+      idempotent(),
+    );
+    const body = unwrapEnvelope<Partial<ExpiryScanResult>>(response.data);
+    return {
+      remindersSent: body?.remindersSent ?? 0,
+      expiringMarked: body?.expiringMarked ?? 0,
+      deactivated: body?.deactivated ?? 0,
+      scanned: body?.scanned ?? 0,
+    };
   } catch (e) {
     throw toApiError(e);
   }

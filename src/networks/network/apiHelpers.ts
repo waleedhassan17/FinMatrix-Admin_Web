@@ -335,3 +335,16 @@ export const authedBlob = async (path: string, config?: AxiosRequestConfig): Pro
   });
   return response.data;
 };
+
+/**
+ * An Idempotency-Key header for a mutation that must not run twice.
+ *
+ * The server honours this (common/interceptors/idempotency.interceptor.ts):
+ * a replayed key returns the first response instead of doing the work again.
+ * Worth having on approve, reject, subscription assignment and the expiry
+ * scan, where a double-tap on a slow connection otherwise means a second
+ * round of side effects — emails sent twice, revenue recorded twice.
+ */
+export const idempotent = (): AxiosRequestConfig => ({
+  headers: { 'Idempotency-Key': crypto.randomUUID() },
+});

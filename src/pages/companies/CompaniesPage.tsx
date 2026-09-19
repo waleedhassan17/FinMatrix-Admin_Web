@@ -9,7 +9,7 @@
 // dashboard can point at and a reviewer can bookmark.
 
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -19,6 +19,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DataTable, TablePager } from '@/components/ui/DataTable';
 import { Textarea } from '@/components/ui/Field';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { useSettle } from '@/features/platform/invalidation';
 import { cn } from '@/lib/cn';
 import {
   COMPANY_FILTERS,
@@ -51,7 +52,7 @@ type Decision = { company: CompanyListItem; action: 'approve' | 'reject' };
 
 export function CompaniesPage() {
   const [params, setParams] = useSearchParams();
-  const queryClient = useQueryClient();
+  const { afterCompanyDecision } = useSettle();
 
   const raw = params.get('filter');
   const filter: CompanyFilter = isCompanyFilter(raw) ? raw : 'all';
@@ -93,9 +94,7 @@ export function CompaniesPage() {
         action === 'reject' ? reason.trim() : undefined,
       ),
     onSuccess: (_updated, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['companies'] });
-      // The dashboard's pending count comes from a different endpoint.
-      queryClient.invalidateQueries({ queryKey: ['platform'] });
+      afterCompanyDecision(variables.company.id);
       toast.success(
         variables.action === 'approve' ? 'Company approved' : 'Company rejected',
         { description: variables.company.name },
