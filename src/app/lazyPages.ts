@@ -16,6 +16,9 @@
 import { lazyWithReload } from './lazyWithReload';
 
 export const LoginPage = lazyWithReload(() => import('@/pages/auth/LoginPage'));
+export const ResetPasswordPage = lazyWithReload(
+  () => import('@/pages/auth/ResetPasswordPage'),
+);
 export const DashboardPage = lazyWithReload(
   () => import('@/pages/DashboardPage'),
 );

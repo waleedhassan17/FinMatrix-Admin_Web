@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { ShieldCheck } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -127,6 +127,20 @@ export function LoginPage() {
           >
             {signIn.isPending ? 'Signing in…' : 'Sign in'}
           </Button>
+
+          {/* The only recovery entry point used to be behind the login wall,
+              on the Settings page -- which is no use to the one person who
+              needs it. */}
+          <Link
+            to={`/reset-password${
+              identifier.includes('@')
+                ? `?email=${encodeURIComponent(identifier)}`
+                : ''
+            }`}
+            className="mt-md inline-block text-label-md text-primary hover:underline"
+          >
+            Forgot password?
+          </Link>
 
           <p className="mt-md text-caption text-text-tertiary">
             256-bit SSL encrypted connection

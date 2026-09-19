@@ -19,6 +19,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import {
   AnalyticsPage,
   CompaniesPage,
+  ResetPasswordPage,
   CompanyDetailPage,
   DashboardPage,
   LoginPage,
@@ -83,6 +84,9 @@ export const router = createBrowserRouter([
           </RedirectIfAuthenticated>
         ),
       },
+      // Outside the auth guard on purpose: someone who cannot sign in is
+      // exactly who needs this page.
+      { path: '/reset-password', element: <ResetPasswordPage /> },
       {
         element: (
           <RequireSuperAdmin>
