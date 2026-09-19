@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { messageOf } from '@/utils/errorMessage';
 
 /**
  * A record page while it loads: header, a sheet and a rail, in their real
@@ -90,5 +91,50 @@ export function PageMessage({
         )}
       </div>
     </Card>
+  );
+}
+
+/**
+ * An inline failure strip above content that still renders.
+ *
+ * Deliberately NOT PageMessage, which is a centred full-page card with an icon
+ * circle and a way out. Five pages hand-rolled this same strip, and PageMessage
+ * would have been the wrong shape for every one of them: these sit above a
+ * table or a set of tiles that are still worth showing, so taking over the page
+ * would hide data that loaded fine. PageMessage is for when there is genuinely
+ * nothing to show -- a 404, or a list that failed with nothing cached.
+ *
+ * None of the five offered a retry. This one does, when the caller can supply
+ * it, because "could not load" without "try again" makes the reader reload the
+ * whole console.
+ */
+export function ErrorBanner({
+  error,
+  fallback,
+  onRetry,
+}: {
+  error: unknown;
+  fallback: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-sm rounded-md bg-danger-lighter p-sm"
+    >
+      <AlertTriangle
+        className="mt-[2px] size-4 shrink-0 text-danger"
+        aria-hidden="true"
+      />
+      <p className="flex-1 text-body-sm text-danger">
+        {messageOf(error, fallback)}
+      </p>
+      {onRetry && (
+        <Button variant="text" size="sm" onClick={onRetry}>
+          <RotateCw className="size-4" aria-hidden="true" />
+          Try again
+        </Button>
+      )}
+    </div>
   );
 }

@@ -22,7 +22,13 @@ import { selectUser } from '@/store/authSlice';
 import { useAppSelector } from '@/store/store';
 import { initialsOf } from '@/utils/initials';
 
-export function Topbar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
+interface TopbarProps {
+  onOpenMobileNav: () => void;
+  /** Reported as aria-expanded -- this button is the drawer's disclosure control. */
+  mobileNavOpen: boolean;
+}
+
+export function Topbar({ onOpenMobileNav, mobileNavOpen }: TopbarProps) {
   const user = useAppSelector(selectUser);
   const signOut = useSignOut();
   const navigate = useNavigate();
@@ -33,6 +39,8 @@ export function Topbar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
         type="button"
         onClick={onOpenMobileNav}
         aria-label="Open navigation"
+        aria-expanded={mobileNavOpen}
+        aria-controls="admin-sidebar"
         className="rounded-sm p-xxs text-text-secondary hover:text-text-primary lg:hidden"
       >
         <Menu className="size-5" />

@@ -5,10 +5,10 @@
 // capability filtering. The gradient and the brand row are kept so the two
 // products read as one.
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ShieldCheck, X } from 'lucide-react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 
 import { NAV_ITEMS } from '@/config/nav';
 import { cn } from '@/lib/cn';
@@ -24,13 +24,14 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
   // Not persisted, matching the customer site. A collapsed sidebar is a
   // per-session preference, not a setting.
   const [collapsed, setCollapsed] = useState(false);
-  const location = useLocation();
 
-  // The drawer must close on navigation, or a tap on mobile leaves the scrim up
-  // over the page it just opened.
-  useEffect(() => {
-    onCloseMobile();
-  }, [location.pathname, onCloseMobile]);
+  // The drawer closes from the events that close it: the nav links below, the
+  // X button, and the scrim. It used to close from an effect keyed on the path
+  // AND on onCloseMobile -- and because the prop was an inline arrow, every
+  // parent render gave it a fresh identity. Opening the drawer re-rendered the
+  // parent, which re-fired the effect, which closed the drawer in the frame it
+  // opened. It could never open on a phone, where this is the only navigation
+  // there is.
 
   // How many submissions are waiting. Polled rather than invalidated, because
   // the queue changes when a tenant pays, not when this console does anything.
@@ -43,10 +44,14 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
 
   return (
     <>
+      {/* Tap-outside-to-dismiss. Hidden from assistive tech on purpose: it
+          duplicates the X button below, and two controls reading "Close
+          navigation" is worse than one. */}
       {mobileOpen && (
         <button
           type="button"
-          aria-label="Close navigation"
+          aria-hidden="true"
+          tabIndex={-1}
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={onCloseMobile}
         />
@@ -61,6 +66,7 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
       />
 
       <aside
+        id="admin-sidebar"
         style={{ background: SIDEBAR_GRADIENT }}
         className={cn(
           'fixed left-0 top-0 z-50 flex h-screen w-72 flex-col text-white shadow-xl transition-all duration-300',
@@ -97,6 +103,11 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
                   <NavLink
                     to={item.path}
                     title={collapsed ? item.title : undefined}
+                    // Closes the drawer on the tap that navigates. Doing it here
+                    // rather than from an effect on the path keeps it tied to the
+                    // event that caused it, and leaves the drawer with no
+                    // dependency on any render-identity staying stable.
+                    onClick={onCloseMobile}
                     className={({ isActive }) =>
                       cn(
                         'flex items-center gap-sm rounded-lg px-sm py-[10px] text-label-md transition-colors',

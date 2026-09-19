@@ -13,13 +13,17 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { ErrorBanner } from '@/components/layout/PageState';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Field';
+
+import { SubscriptionsPanel } from './SubscriptionsPanel';
 import { resolvePlanFeatures } from '@/models/planFeatures';
 import type { SubscriptionPlan } from '@/models/platform';
 import { getSubscriptionPlans } from '@/networks/superAdmin/platformNetwork';
 import { formatMoney } from '@/utils/money';
 
 export function PlansPage() {
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['plans', 'list'],
     queryFn: getSubscriptionPlans,
   });
@@ -30,9 +34,19 @@ export function PlansPage() {
     <div className="flex flex-col gap-lg">
       <PageHeader
         title="Subscription plans"
-        description="What the platform sells, as the server defines it."
+        description="What the platform sells, and who is on what."
       />
 
+      <Tabs defaultValue="catalogue">
+        <TabsList>
+          <TabsTrigger value="catalogue" count={plans.length}>
+            Catalogue
+          </TabsTrigger>
+          <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="catalogue">
+          <div className="flex flex-col gap-lg pt-md">
       <div className="flex items-start gap-sm rounded-md border border-info-light bg-primary-tint p-md">
         <Info className="mt-[2px] size-4 shrink-0 text-info" aria-hidden="true" />
         <p className="text-body-sm text-text-secondary">
@@ -43,11 +57,11 @@ export function PlansPage() {
       </div>
 
       {isError && (
-        <div role="alert" className="rounded-md bg-danger-lighter p-sm">
-          <p className="text-body-sm text-danger">
-            {(error as Error)?.message ?? 'Could not load plans.'}
-          </p>
-        </div>
+        <ErrorBanner
+          error={error}
+          fallback="Could not load plans."
+          onRetry={refetch}
+        />
       )}
 
       {isLoading ? (
@@ -69,6 +83,15 @@ export function PlansPage() {
           ))}
         </div>
       )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="subscriptions">
+          <div className="pt-md">
+            <SubscriptionsPanel plans={plans} />
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

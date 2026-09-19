@@ -14,10 +14,13 @@ import {
 } from '@/features/auth/SessionGate';
 import { AppLayout } from '@/features/shell/AppLayout';
 import { reportError } from '@/app/observability';
+import { Spinner } from '@/components/ui/Spinner';
 
 import {
   AnalyticsPage,
   CompaniesPage,
+  ResetPasswordPage,
+  CompanyDetailPage,
   DashboardPage,
   LoginPage,
   NotFoundPage,
@@ -32,7 +35,7 @@ function RouteFallback() {
       className="flex min-h-screen items-center justify-center bg-background"
       aria-busy="true"
     >
-      <div className="size-8 animate-spin rounded-full border-2 border-border border-t-primary" />
+      <Spinner />
     </div>
   );
 }
@@ -81,6 +84,9 @@ export const router = createBrowserRouter([
           </RedirectIfAuthenticated>
         ),
       },
+      // Outside the auth guard on purpose: someone who cannot sign in is
+      // exactly who needs this page.
+      { path: '/reset-password', element: <ResetPasswordPage /> },
       {
         element: (
           <RequireSuperAdmin>
@@ -91,6 +97,7 @@ export const router = createBrowserRouter([
         children: [
           { path: 'dashboard', element: <DashboardPage /> },
           { path: 'companies', element: <CompaniesPage /> },
+          { path: 'companies/:id', element: <CompanyDetailPage /> },
           { path: 'payments', element: <PaymentsPage /> },
           { path: 'analytics', element: <AnalyticsPage /> },
           { path: 'plans', element: <PlansPage /> },

@@ -4,16 +4,21 @@
 
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { LogOut, Mail, ShieldCheck } from 'lucide-react';
+import { LogOut, Mail, RotateCw, ShieldCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Switch } from '@/components/ui/Field';
 import { KeyValueList } from '@/components/ui/KeyValueList';
 import { useSignOut } from '@/features/auth/useSignOut';
+import { useSettle } from '@/features/platform/invalidation';
+import type { ExpiryScanResult } from '@/models/platform';
 import { authForgotPassword } from '@/networks/auth/authNetwork';
+import { runExpiryScan } from '@/networks/superAdmin/submissionNetwork';
 import { selectUser } from '@/store/authSlice';
 import { useAppSelector } from '@/store/store';
 import {
@@ -25,6 +30,10 @@ import {
 export function SettingsPage() {
   const user = useAppSelector(selectUser);
   const signOut = useSignOut();
+  const navigate = useNavigate();
+  const { afterExpiryScan } = useSettle();
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanResult, setScanResult] = useState<ExpiryScanResult | null>(null);
   const [prefs, setPrefs] = useState<NotificationPrefs>(() =>
     getNotificationPrefs(),
   );
@@ -38,14 +47,45 @@ export function SettingsPage() {
   // The console has no change-password form of its own: it reuses the account
   // recovery flow, so the new password is set behind an emailed code rather
   // than by anyone who finds an unlocked screen.
+  //
+  // This used to toast "Reset code sent" and stop there -- with nowhere in the
+  // console to enter the code, so the admin had to finish in another client.
+  // It hands off to /reset-password now, and reports ownerManaged rather than
+  // claiming a code was sent when none was.
   const sendReset = useMutation({
     mutationFn: () => authForgotPassword(user?.email ?? ''),
-    onSuccess: () =>
+    onSuccess: (result) => {
+      if (result.ownerManaged) {
+        toast.info('This account is managed for you', {
+          description:
+            result.message ?? 'Ask the account owner to reset it.',
+        });
+        return;
+      }
       toast.success('Reset code sent', {
         description: `Check ${user?.email} for the code.`,
-      }),
+      });
+      navigate(
+        `/reset-password?email=${encodeURIComponent(user?.email ?? '')}&sent=1`,
+      );
+    },
     onError: (e: Error) =>
       toast.error('Could not send the code', { description: e.message }),
+  });
+
+  // The 1 AM cron, on demand. Destructive at scale: it deactivates every
+  // company whose subscription has lapsed and emails all of them, which is why
+  // it confirms first and reports what it actually did rather than a toast
+  // saying "done".
+  const scan = useMutation({
+    mutationFn: runExpiryScan,
+    onSuccess: (result) => {
+      afterExpiryScan();
+      setScanOpen(false);
+      setScanResult(result);
+    },
+    onError: (e: Error) =>
+      toast.error('The scan did not run', { description: e.message }),
   });
 
   return (
@@ -130,6 +170,60 @@ export function SettingsPage() {
           </Button>
         </div>
       </Card>
+
+      <Card className="p-lg">
+        <SectionHeader title="Maintenance" />
+        <div className="mt-md flex flex-wrap items-center justify-between gap-md">
+          <div className="min-w-0">
+            <p className="text-label-md text-text-primary">
+              Run the subscription expiry scan
+            </p>
+            <p className="text-body-sm text-text-secondary">
+              Normally runs nightly. Deactivates companies whose subscription
+              has lapsed, flags the ones about to, and emails them.
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => setScanOpen(true)}
+            disabled={scan.isPending}
+          >
+            <RotateCw className="size-4" aria-hidden="true" />
+            {scan.isPending ? 'Running…' : 'Run now'}
+          </Button>
+        </div>
+
+        {scanResult && (
+          <div className="mt-md rounded-md bg-neutral-50 p-md">
+            <p className="text-label-md text-text-primary">Last run</p>
+            <div className="mt-xs">
+              <KeyValueList
+                items={[
+                  { label: 'Companies scanned', value: scanResult.scanned },
+                  { label: 'Reminders sent', value: scanResult.remindersSent },
+                  { label: 'Marked expiring', value: scanResult.expiringMarked },
+                  {
+                    label: 'Deactivated',
+                    value: scanResult.deactivated,
+                    emphasis: scanResult.deactivated > 0,
+                  },
+                ]}
+              />
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <ConfirmDialog
+        open={scanOpen}
+        onOpenChange={setScanOpen}
+        title="Run the expiry scan now?"
+        description="Every company whose subscription has lapsed will be deactivated, and those about to lapse will be emailed. This is the same work the nightly job does."
+        confirmLabel="Run the scan"
+        destructive
+        busy={scan.isPending}
+        onConfirm={() => scan.mutate()}
+      />
 
       <Card className="p-lg">
         <div className="flex flex-wrap items-center justify-between gap-md">

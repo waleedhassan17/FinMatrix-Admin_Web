@@ -9,8 +9,8 @@
 // dashboard can point at and a reviewer can bookmark.
 
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -19,14 +19,22 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DataTable, TablePager } from '@/components/ui/DataTable';
 import { Textarea } from '@/components/ui/Field';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { cn } from '@/lib/cn';
+import { useSettle } from '@/features/platform/invalidation';
+import { ErrorBanner } from '@/components/layout/PageState';
+import { formatDate } from '@/utils/date';
+import { Chip } from '@/components/ui/Chip';
 import {
   COMPANY_FILTERS,
   isCompanyFilter,
+  isTrialFilter,
+  normalizeCompanyStatus,
   REJECT_REASONS,
   statusParamFor,
+  TRIAL_FILTERS,
+  trialParamFor,
   type CompanyFilter,
   type CompanyListItem,
+  type TrialFilter,
 } from '@/models/platform';
 import {
   getCompanies,
@@ -35,50 +43,71 @@ import {
 
 const PAGE_SIZE = 20;
 
-const dateOf = (iso: string | null): string => {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-};
 
-type Decision = { company: CompanyListItem; action: 'approve' | 'reject' };
+/**
+ * The four decisions a reviewer can take, and the status each one sends.
+ *
+ * The console only ever sent 'active' and 'rejected' before, so the Inactive
+ * filter chip listed a state nothing here could produce -- and nothing could
+ * undo. The server accepts 'suspended' as a synonym but STORES 'inactive', so
+ * 'inactive' is what gets sent; see normalizeCompanyStatus.
+ */
+const DECISIONS = {
+  approve: { status: 'active', toast: 'Company approved' },
+  reject: { status: 'rejected', toast: 'Company rejected' },
+  suspend: { status: 'inactive', toast: 'Company suspended' },
+  reactivate: { status: 'active', toast: 'Company reactivated' },
+} as const;
+
+type DecisionAction = keyof typeof DECISIONS;
+type Decision = { company: CompanyListItem; action: DecisionAction };
 
 export function CompaniesPage() {
   const [params, setParams] = useSearchParams();
-  const queryClient = useQueryClient();
+  const { afterCompanyDecision } = useSettle();
+
+  const navigate = useNavigate();
 
   const raw = params.get('filter');
   const filter: CompanyFilter = isCompanyFilter(raw) ? raw : 'all';
+  const rawTrial = params.get('trial');
+  const trial: TrialFilter = isTrialFilter(rawTrial) ? rawTrial : 'all';
   const page = Math.max(1, Number(params.get('page') ?? 1) || 1);
 
   const [decision, setDecision] = useState<Decision | null>(null);
   const [reason, setReason] = useState('');
 
+  // Changing any filter resets to page 1: page 3 of "all" is rarely page 3 of
+  // "pending", and landing on an empty page reads as "nothing here".
   const setFilter = (next: CompanyFilter) => {
-    // Changing the filter resets to page 1: page 3 of "all" is rarely page 3
-    // of "pending", and landing on an empty page reads as "nothing here".
-    setParams(next === 'all' ? {} : { filter: next });
+    const q: Record<string, string> = {};
+    if (next !== 'all') q.filter = next;
+    if (trial !== 'all') q.trial = trial;
+    setParams(q);
+  };
+
+  const setTrial = (next: TrialFilter) => {
+    const q: Record<string, string> = {};
+    if (filter !== 'all') q.filter = filter;
+    if (next !== 'all') q.trial = next;
+    setParams(q);
   };
 
   const setPage = (next: number) => {
     const q: Record<string, string> = { page: String(next) };
     if (filter !== 'all') q.filter = filter;
+    if (trial !== 'all') q.trial = trial;
     setParams(q);
   };
 
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['companies', 'list', { filter, page }],
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['companies', 'list', { filter, trial, page }],
     queryFn: () =>
       getCompanies({
         page,
         limit: PAGE_SIZE,
         status: statusParamFor(filter),
+        isTrial: trialParamFor(trial),
       }),
     // Keeps the current page on screen while the next one loads, so the table
     // does not collapse to a skeleton on every pager click.
@@ -86,20 +115,17 @@ export function CompaniesPage() {
   });
 
   const decide = useMutation({
-    mutationFn: ({ company, action }: Decision & { reason?: string }) =>
+    mutationFn: ({ company, action }: Decision) =>
       updateCompanyStatus(
         company.id,
-        action === 'approve' ? 'active' : 'rejected',
+        DECISIONS[action].status,
         action === 'reject' ? reason.trim() : undefined,
       ),
     onSuccess: (_updated, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['companies'] });
-      // The dashboard's pending count comes from a different endpoint.
-      queryClient.invalidateQueries({ queryKey: ['platform'] });
-      toast.success(
-        variables.action === 'approve' ? 'Company approved' : 'Company rejected',
-        { description: variables.company.name },
-      );
+      afterCompanyDecision(variables.company.id);
+      toast.success(DECISIONS[variables.action].toast, {
+        description: variables.company.name,
+      });
       setDecision(null);
       setReason('');
     },
@@ -109,7 +135,9 @@ export function CompaniesPage() {
 
   const rows = data?.data ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // From the server's pagination block rather than recomputed, so a short page
+  // or a changed server-side limit cannot drift the pager.
+  const totalPages = data?.pages ?? Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const columns = useMemo(
     () => [
@@ -118,9 +146,12 @@ export function CompaniesPage() {
         accessorKey: 'name',
         cell: ({ row }: { row: { original: CompanyListItem } }) => (
           <div className="min-w-0">
-            <p className="truncate text-label-lg text-text-primary">
+            <Link
+              to={`/companies/${row.original.id}`}
+              className="truncate text-label-lg text-text-primary hover:text-primary hover:underline"
+            >
               {row.original.name}
-            </p>
+            </Link>
             <p className="truncate text-body-sm text-text-secondary">
               {row.original.email ?? row.original.industry ?? '—'}
             </p>
@@ -132,7 +163,7 @@ export function CompaniesPage() {
         accessorKey: 'status',
         cell: ({ row }: { row: { original: CompanyListItem } }) => (
           <div className="flex flex-col items-start gap-xxs">
-            <StatusBadge status={row.original.status} />
+            <StatusBadge status={normalizeCompanyStatus(row.original.status)} />
             {row.original.rejectionReason && (
               <span className="text-caption text-text-tertiary">
                 {row.original.rejectionReason}
@@ -144,8 +175,18 @@ export function CompaniesPage() {
       {
         header: 'Plan',
         accessorKey: 'planName',
-        cell: ({ row }: { row: { original: CompanyListItem } }) =>
-          row.original.planName ?? '—',
+        cell: ({ row }: { row: { original: CompanyListItem } }) => (
+          <div className="flex flex-col items-start gap-xxs">
+            <span>{row.original.planName ?? '—'}</span>
+            {/* The server has always sent isTrial; nothing rendered it, so a
+                trial company was indistinguishable from a paying one. */}
+            {row.original.isTrial && (
+              <span className="rounded-full bg-warning-lighter px-xs text-caption text-warning">
+                {row.original.trialConvertedAt ? 'Converted' : 'On trial'}
+              </span>
+            )}
+          </div>
+        ),
       },
       {
         header: 'Members',
@@ -158,7 +199,7 @@ export function CompaniesPage() {
         header: 'Registered',
         accessorKey: 'createdAt',
         cell: ({ row }: { row: { original: CompanyListItem } }) =>
-          dateOf(row.original.createdAt),
+          formatDate(row.original.createdAt),
       },
       {
         header: '',
@@ -166,27 +207,57 @@ export function CompaniesPage() {
         meta: { align: 'right' },
         cell: ({ row }: { row: { original: CompanyListItem } }) => {
           const c = row.original;
-          // Only a company still waiting can be decided. An active or already
-          // rejected one needs a different action, not these two.
-          const pending = c.status === 'pending' || c.status === 'pending_approval';
-          if (!pending) return null;
+          const status = normalizeCompanyStatus(c.status);
+
+          // Every state the filters can reach now has a way out of it. Before
+          // this, only 'pending' had actions -- so the Inactive chip listed
+          // companies the console could neither produce nor restore.
+          if (status === 'pending') {
+            return (
+              <div className="flex justify-end gap-xs">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setReason('');
+                    setDecision({ company: c, action: 'reject' });
+                  }}
+                >
+                  Reject
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setDecision({ company: c, action: 'approve' })}
+                >
+                  Approve
+                </Button>
+              </div>
+            );
+          }
+
+          if (status === 'active') {
+            return (
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setDecision({ company: c, action: 'suspend' })}
+                >
+                  Suspend
+                </Button>
+              </div>
+            );
+          }
+
+          // Inactive or rejected: both can be put back to active.
           return (
-            <div className="flex justify-end gap-xs">
+            <div className="flex justify-end">
               <Button
                 size="sm"
                 variant="secondary"
-                onClick={() => {
-                  setReason('');
-                  setDecision({ company: c, action: 'reject' });
-                }}
+                onClick={() => setDecision({ company: c, action: 'reactivate' })}
               >
-                Reject
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => setDecision({ company: c, action: 'approve' })}
-              >
-                Approve
+                Reactivate
               </Button>
             </div>
           );
@@ -205,11 +276,11 @@ export function CompaniesPage() {
       />
 
       {isError && (
-        <div role="alert" className="rounded-md bg-danger-lighter p-sm">
-          <p className="text-body-sm text-danger">
-            {(error as Error)?.message ?? 'Could not load companies.'}
-          </p>
-        </div>
+        <ErrorBanner
+          error={error}
+          fallback="Could not load companies."
+          onRetry={refetch}
+        />
       )}
 
       <div>
@@ -217,6 +288,7 @@ export function CompaniesPage() {
           isLoading={isLoading}
           data={rows}
           columns={columns as never}
+          onRowClick={(c: CompanyListItem) => navigate(`/companies/${c.id}`)}
           empty={
             <span className="text-body-sm text-text-tertiary">
               {filter === 'all'
@@ -225,22 +297,31 @@ export function CompaniesPage() {
             </span>
           }
           toolbar={
-            <div className="flex flex-wrap items-center gap-sm border-b border-border-light p-md">
-              {COMPANY_FILTERS.map((f) => (
-                <button
-                  key={f.value}
-                  type="button"
-                  onClick={() => setFilter(f.value)}
-                  className={cn(
-                    'rounded-full px-sm py-xxs text-label-md transition-colors',
-                    filter === f.value
-                      ? 'bg-primary text-text-inverse'
-                      : 'bg-neutral-100 text-text-secondary hover:bg-neutral-200',
-                  )}
-                >
-                  {f.label}
-                </button>
-              ))}
+            <div className="flex flex-col gap-sm border-b border-border-light p-md">
+              <div className="flex flex-wrap items-center gap-sm">
+                {COMPANY_FILTERS.map((f) => (
+                  <Chip
+                    key={f.value}
+                    active={filter === f.value}
+                    onClick={() => setFilter(f.value)}
+                  >
+                    {f.label}
+                  </Chip>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-xs">
+                <span className="text-label-sm text-text-tertiary">Trial</span>
+                {TRIAL_FILTERS.map((f) => (
+                  <Chip
+                    key={f.value}
+                    size="sm"
+                    active={trial === f.value}
+                    onClick={() => setTrial(f.value)}
+                  >
+                    {f.label}
+                  </Chip>
+                ))}
+              </div>
             </div>
           }
         />
@@ -258,6 +339,27 @@ export function CompaniesPage() {
         title="Approve this company?"
         description={`${decision?.company.name ?? ''} will be able to sign in and start using FinMatrix.`}
         confirmLabel="Approve"
+        busy={decide.isPending}
+        onConfirm={() => decision && decide.mutate({ ...decision })}
+      />
+
+      <ConfirmDialog
+        open={decision?.action === 'suspend'}
+        onOpenChange={(open) => !open && setDecision(null)}
+        title="Suspend this company?"
+        description={`${decision?.company.name ?? ''} will be blocked from signing in until it is reactivated. Its data is kept.`}
+        confirmLabel="Suspend"
+        destructive
+        busy={decide.isPending}
+        onConfirm={() => decision && decide.mutate({ ...decision })}
+      />
+
+      <ConfirmDialog
+        open={decision?.action === 'reactivate'}
+        onOpenChange={(open) => !open && setDecision(null)}
+        title="Reactivate this company?"
+        description={`${decision?.company.name ?? ''} will be able to sign in again.`}
+        confirmLabel="Reactivate"
         busy={decide.isPending}
         onConfirm={() => decision && decide.mutate({ ...decision })}
       />
@@ -281,19 +383,9 @@ export function CompaniesPage() {
         <div className="flex flex-col gap-sm">
           <div className="flex flex-wrap gap-xs">
             {REJECT_REASONS.map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setReason(r)}
-                className={cn(
-                  'rounded-full px-sm py-xxs text-label-sm transition-colors',
-                  reason === r
-                    ? 'bg-primary text-text-inverse'
-                    : 'bg-neutral-100 text-text-secondary hover:bg-neutral-200',
-                )}
-              >
+              <Chip key={r} active={reason === r} size="sm" onClick={() => setReason(r)}>
                 {r}
-              </button>
+              </Chip>
             ))}
           </div>
           {/* Page-managed rather than ConfirmDialog's built-in `reason` slot:

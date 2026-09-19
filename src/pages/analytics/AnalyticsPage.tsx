@@ -21,6 +21,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
 import { StatTile } from '@/components/ui/StatTile';
+import { ErrorBanner } from '@/components/layout/PageState';
+import { formatDayMonth } from '@/utils/date';
 import { cn } from '@/lib/cn';
 import {
   shareOfTotal,
@@ -42,15 +44,9 @@ const AXIS_TICK = {
   fontSize: typography.caption.fontSize,
 } as const;
 
-const dateOf = (iso: string): string => {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-};
 
 export function AnalyticsPage() {
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['revenue', 'summary'],
     queryFn: getPlatformRevenue,
   });
@@ -67,11 +63,11 @@ export function AnalyticsPage() {
       />
 
       {isError && (
-        <div role="alert" className="rounded-md bg-danger-lighter p-sm">
-          <p className="text-body-sm text-danger">
-            {(error as Error)?.message ?? 'Could not load revenue.'}
-          </p>
-        </div>
+        <ErrorBanner
+          error={error}
+          fallback="Could not load revenue."
+          onRetry={refetch}
+        />
       )}
 
       <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
@@ -263,7 +259,7 @@ export function AnalyticsPage() {
             {
               header: 'Recorded',
               accessorKey: 'recordedAt',
-              cell: ({ row }) => dateOf(row.original.recordedAt),
+              cell: ({ row }) => formatDayMonth(row.original.recordedAt),
             },
             {
               header: 'Amount',

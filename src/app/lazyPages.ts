@@ -16,11 +16,17 @@
 import { lazyWithReload } from './lazyWithReload';
 
 export const LoginPage = lazyWithReload(() => import('@/pages/auth/LoginPage'));
+export const ResetPasswordPage = lazyWithReload(
+  () => import('@/pages/auth/ResetPasswordPage'),
+);
 export const DashboardPage = lazyWithReload(
   () => import('@/pages/DashboardPage'),
 );
 export const CompaniesPage = lazyWithReload(
   () => import('@/pages/companies/CompaniesPage'),
+);
+export const CompanyDetailPage = lazyWithReload(
+  () => import('@/pages/companies/CompanyDetailPage'),
 );
 export const PaymentsPage = lazyWithReload(
   () => import('@/pages/payments/PaymentsPage'),
