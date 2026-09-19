@@ -31,6 +31,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useSettle } from '@/features/platform/invalidation';
 import { ErrorBanner } from '@/components/layout/PageState';
 import { Chip } from '@/components/ui/Chip';
+import { TablePager } from '@/components/ui/DataTable';
 import { Dialog } from '@/components/ui/Dialog';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/lib/cn';
@@ -55,6 +56,9 @@ import {
 } from '@/networks/superAdmin/submissionNetwork';
 
 /** The app's KIND_COLORS, as token-backed classes. */
+// Card-shaped rows, so a page of 25 is already a long scroll.
+const PAGE_SIZE = 25;
+
 const KIND_CLASS: Record<string, string> = {
   NEW: 'bg-info-light text-info',
   RENEWAL: 'bg-success-lighter text-success',
@@ -72,6 +76,9 @@ export function PaymentsPage() {
     : 'submitted';
   const rawKind = params.get('kind');
   const kind: KindKey = isKindKey(rawKind) ? rawKind : 'all';
+  // Same clamp as CompaniesPage: this is user-editable, and NaN or 0 would
+  // slice an empty window out of a queue that has rows in it.
+  const page = Math.max(1, Number(params.get('page') ?? 1) || 1);
 
   const [rejecting, setRejecting] = useState<PaymentSubmissionView | null>(null);
   const [approving, setApproving] = useState<PaymentSubmissionView | null>(null);
@@ -79,12 +86,21 @@ export function PaymentsPage() {
   const [blockFutureTrials, setBlockFutureTrials] = useState(false);
   const [viewing, setViewing] = useState<PaymentSubmissionView | null>(null);
 
+  // Changing a filter drops back to page 1 -- page 3 of "approved" is not
+  // page 3 of "submitted", and landing past the end reads as an empty queue.
   const setFilters = (next: { status?: SubmissionStatus; kind?: KindKey }) => {
     const q: Record<string, string> = {};
     const s = next.status ?? status;
     const k = next.kind ?? kind;
     if (s !== 'submitted') q.status = s;
     if (k !== 'all') q.kind = k;
+    setParams(q);
+  };
+
+  const setPage = (next: number) => {
+    const q: Record<string, string> = { page: String(next) };
+    if (status !== 'submitted') q.status = status;
+    if (kind !== 'all') q.kind = kind;
     setParams(q);
   };
 
@@ -97,6 +113,10 @@ export function PaymentsPage() {
         // Oldest first while reviewing: the longest wait is the most urgent.
         order: status === 'submitted' ? 'asc' : 'desc',
       }),
+    // The decided tabs are history. The submitted queue changes when a tenant
+    // pays; approved and rejected only grow, and this endpoint sends all of
+    // them, so refetching that on every visit is the expensive half.
+    staleTime: status === 'submitted' ? 30_000 : 5 * 60_000,
   });
 
   const settle = afterSubmissionDecision;
@@ -135,14 +155,26 @@ export function PaymentsPage() {
       toast.error('Could not reject', { description: e.message }),
   });
 
+  // This endpoint has NO server-side limit -- it returns every row matching
+  // the filters. For `submitted` that is bounded by the review backlog, but
+  // `approved` grows forever: every payment ever taken. Nothing can be done
+  // about the payload without a backend change, but rendering all of it is
+  // the part that makes the page unusable, so the list is windowed here.
+  //
+  // Deliberately not useInfiniteQuery: there is no cursor, and paging an array
+  // already held in memory is a lie dressed as pagination.
   const rows = data ?? [];
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const visible = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="flex flex-col gap-lg">
       <PageHeader
         title="Payment submissions"
         description="Bank transfers and free-trial requests waiting on a decision."
-        meta={[rows.length > 0 ? `${rows.length} shown` : null]}
+        // "shown" was the one honest label while the page rendered everything,
+        // and becomes wrong the moment it does not.
+        meta={[rows.length > 0 ? `${rows.length} total` : null]}
       />
 
       <div className="flex flex-wrap items-center gap-md">
@@ -195,7 +227,7 @@ export function PaymentsPage() {
         </Card>
       ) : (
         <div className="flex flex-col gap-sm">
-          {rows.map((s) => (
+          {visible.map((s) => (
             <SubmissionRow
               key={s.id}
               submission={s}
@@ -208,6 +240,15 @@ export function PaymentsPage() {
               onViewScreenshot={() => setViewing(s)}
             />
           ))}
+          {/* TablePager was written for DataTable but is a standalone export,
+              and already prints "Page X of Y · N total" and renders nothing
+              for a single page. */}
+          <TablePager
+            page={page}
+            totalPages={totalPages}
+            total={rows.length}
+            onPage={setPage}
+          />
         </div>
       )}
 

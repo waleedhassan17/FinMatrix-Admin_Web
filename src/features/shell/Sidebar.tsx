@@ -12,7 +12,7 @@ import { NavLink } from 'react-router-dom';
 
 import { NAV_ITEMS } from '@/config/nav';
 import { cn } from '@/lib/cn';
-import { listPaymentSubmissions } from '@/networks/superAdmin/submissionNetwork';
+import { getPlatformRevenue } from '@/networks/superAdmin/submissionNetwork';
 import { SIDEBAR_GRADIENT } from '@/theme/tokens';
 
 interface SidebarProps {
@@ -35,11 +35,26 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
 
   // How many submissions are waiting. Polled rather than invalidated, because
   // the queue changes when a tenant pays, not when this console does anything.
+  //
+  // This used to fetch the whole submitted list every 60s just to read
+  // rows.length -- and that endpoint has no server-side limit, so it was a
+  // full table scan and a full JSON payload per minute, per open tab, forever.
+  // It also used a key of its own, so deciding a submission did not move the
+  // badge.
+  //
+  // The revenue summary already carries pendingSubmissions as a SQL COUNT.
+  // Reading it here gives a fixed-size payload, dedupes with AnalyticsPage's
+  // identical key, and moves the badge the moment a decision settles, because
+  // afterSubmissionDecision already invalidates ['revenue'].
+  //
+  // Taken deliberately: the refetchInterval now applies to that shared cache
+  // entry, so Analytics inherits a 60s poll. For a live revenue view that is
+  // defensible -- and it is a decision, not a side effect nobody noticed.
   const { data: waiting } = useQuery({
-    queryKey: ['submissions', 'waiting-count'],
-    queryFn: () => listPaymentSubmissions({ status: 'submitted' }),
+    queryKey: ['revenue', 'summary'],
+    queryFn: getPlatformRevenue,
     refetchInterval: 60_000,
-    select: (rows) => rows.length,
+    select: (summary) => summary.pendingSubmissions,
   });
 
   return (

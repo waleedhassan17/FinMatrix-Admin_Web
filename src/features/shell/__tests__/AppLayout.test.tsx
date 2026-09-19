@@ -24,10 +24,10 @@ import authReducer from '@/store/authSlice';
 
 import { AppLayout } from '../AppLayout';
 
-// The Sidebar badge polls the submissions queue. Nothing here is about the
-// badge, and an unmocked call would hit the network.
+// The Sidebar badge reads pendingSubmissions off the revenue summary. Nothing
+// here is about the badge, and an unmocked call would hit the network.
 vi.mock('@/networks/superAdmin/submissionNetwork', () => ({
-  listPaymentSubmissions: vi.fn().mockResolvedValue([]),
+  getPlatformRevenue: vi.fn().mockResolvedValue({ pendingSubmissions: 0 }),
 }));
 
 function renderLayout() {
