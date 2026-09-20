@@ -7,6 +7,7 @@
 
 import {
   api,
+  idempotent,
   toApiError,
   unwrapEnvelope,
 } from '@/networks/network/apiHelpers';
@@ -21,6 +22,7 @@ import type {
   PaginatedList,
   PlatformStats,
   SubscriptionPlan,
+  UpdatePlanInput,
 } from '@/models/platform';
 
 /**
@@ -212,9 +214,54 @@ export const assignSubscription = async (
 };
 
 /**
- * The plan catalogue. Read-only in practice: the server refuses writes with
- * PLANS_CONFIG_DEFINED because plans live in its own plan-config.ts, not in a
- * table an admin can edit.
+ * Edit one plan.
+ *
+ * `key` is the plan key the catalogue returns as `id`
+ * ('warehouse_starter_6mo'), not a UUID. Only what is passed is changed.
+ *
+ * This takes effect immediately on the price new customers are quoted and
+ * charged. It does not alter what anyone has already been billed.
+ */
+export const updatePlan = async (
+  key: string,
+  input: UpdatePlanInput,
+): Promise<SubscriptionPlan> => {
+  try {
+    const response = await api.patch(
+      `/super-admin/plans/${encodeURIComponent(key)}`,
+      input,
+      idempotent(),
+    );
+    return unwrapEnvelope<SubscriptionPlan>(response.data);
+  } catch (e) {
+    throw toApiError(e);
+  }
+};
+
+/**
+ * Put a plan back to exactly what the server configuration declares.
+ *
+ * Not a delete. Deleting a plan would leave every company already on it
+ * pointing at nothing; this only drops the admin's overrides.
+ */
+export const resetPlan = async (key: string): Promise<SubscriptionPlan> => {
+  try {
+    const response = await api.delete(
+      `/super-admin/plans/${encodeURIComponent(key)}`,
+    );
+    return unwrapEnvelope<SubscriptionPlan>(response.data);
+  } catch (e) {
+    throw toApiError(e);
+  }
+};
+
+/**
+ * The plan catalogue.
+ *
+ * Plans are still DEFINED in the server's plan-config.ts -- this is not a
+ * database table of plans. An admin's edits layer on top, so what comes back
+ * here is the configured plan with any override already applied: the same
+ * numbers a customer is quoted and charged.
  */
 export const getSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
   try {

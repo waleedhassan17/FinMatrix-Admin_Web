@@ -153,6 +153,27 @@ export interface ExpiryScanResult {
   scanned: number;
 }
 
+/**
+ * What the console may change on a plan, in MINOR UNITS (paisa).
+ *
+ * Narrow on purpose. The plan key is a foreign key in every company row;
+ * durationMonths is baked into the key ("_6mo") and into what existing
+ * customers were sold; companyType moves the plan to another tier ladder; and
+ * currency would silently reprice every past quote. None of those are here.
+ *
+ * Minor units all the way to the wire: converting a decimal rupee amount into
+ * paisa at the boundary is how someone gets charged a rupee more than the
+ * price they were shown.
+ */
+export interface UpdatePlanInput {
+  label?: string;
+  monthlyMinorUnits?: number;
+  priceMinorUnits?: number;
+  deliveryPersonnelLimit?: number;
+  /** false retires the plan: sold to nobody new, unchanged for everyone on it. */
+  isOffered?: boolean;
+}
+
 export interface SubscriptionPlan {
   id: string;
   name: string;
@@ -168,10 +189,20 @@ export interface SubscriptionPlan {
   // Three-tier model, served from the server's PLAN_CONFIG.
   companyType?: 'small_business' | 'large_org' | 'warehouse' | null;
   durationMonths?: number | null;
+  /** Per-month price in MINOR UNITS — the editable number, not the label. */
+  monthlyMinorUnits?: number;
+  /** TOTAL charged up front for the period, in minor units. */
+  totalMinorUnits?: number;
   monthlyLabel?: string;
   totalLabel?: string;
   currency?: string;
   deliveryPersonnelLimit?: number;
+  /** Still sold to new customers. A retired plan keeps working for its members. */
+  isOffered?: boolean;
+  /** Whether an admin has changed anything from the configured default. */
+  isEdited?: boolean;
+  /** Which fields carry an override, for showing what was changed. */
+  editedFields?: string[];
 }
 
 /**

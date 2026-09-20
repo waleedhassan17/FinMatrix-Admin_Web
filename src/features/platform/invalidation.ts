@@ -70,6 +70,19 @@ export function useSettle() {
     },
 
     /**
+     * A plan price or limit changed.
+     *
+     * ['plans'] is the catalogue itself. ['companies'] goes too because a
+     * company row carries planName, and ['platform'] because the dashboard
+     * counts active plans -- a retired one drops out of both.
+     */
+    afterPlanEdit() {
+      queryClient.invalidateQueries({ queryKey: ['plans'] });
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
+      queryClient.invalidateQueries({ queryKey: ['platform'] });
+    },
+
+    /**
      * The expiry sweep. Deactivates companies and flips subscription status en
      * masse, so everything on screen is suspect -- a blanket invalidate is
      * right here, and enumerating keys is how one gets missed.
