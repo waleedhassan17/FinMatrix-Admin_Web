@@ -9,7 +9,7 @@
 // this is a dialog with a confirm rather than a row of switches on a settings
 // page, and why the copy describes the effect rather than naming the field.
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -40,18 +40,13 @@ export function FeatureOverrideDialog({
 }) {
   const { afterFeatureOverride } = useSettle();
 
+  // Seeded once from the record. The caller keys this component on the company
+  // and the open flag, so reopening remounts with fresh state -- a cancelled
+  // edit cannot leave its changes staged for next time, and there is no effect
+  // writing state during a render pass.
   const [unlocked, setUnlocked] = useState(!!company.allFeaturesUnlocked);
   const [inventory, setInventory] = useState(!!company.inventoryEnabled);
   const [type, setType] = useState<CompanyType | ''>(company.companyType ?? '');
-
-  // Re-seed from the record whenever the dialog opens, so a cancelled edit
-  // does not leave its changes staged for the next time it is opened.
-  useEffect(() => {
-    if (!open) return;
-    setUnlocked(!!company.allFeaturesUnlocked);
-    setInventory(!!company.inventoryEnabled);
-    setType(company.companyType ?? '');
-  }, [open, company]);
 
   const save = useMutation({
     mutationFn: () => {

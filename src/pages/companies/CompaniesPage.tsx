@@ -8,7 +8,7 @@
 // The filter lives in the URL, so /companies?filter=pending is a link the
 // dashboard can point at and a reviewer can bookmark.
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -139,8 +139,10 @@ export function CompaniesPage() {
   // or a changed server-side limit cannot drift the pager.
   const totalPages = data?.pages ?? Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const columns = useMemo(
-    () => [
+  // Not memoised: the cells close over setDecision and setReason, and an
+  // empty dep array made React Compiler skip optimising the whole component
+  // rather than trust the mismatch. Building five column defs is cheap.
+  const columns = [
       {
         header: 'Company',
         accessorKey: 'name',
@@ -263,9 +265,7 @@ export function CompaniesPage() {
           );
         },
       },
-    ],
-    [],
-  );
+  ];
 
   return (
     <div className="flex flex-col gap-lg">

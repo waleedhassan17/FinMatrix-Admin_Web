@@ -266,7 +266,11 @@ export function CompanyDetailPage() {
         )}
       </Card>
 
+      {/* Keyed on the record, so reopening it remounts with fresh initial
+          state rather than re-seeding from an effect. Same pattern
+          PaymentsPage uses to key the screenshot viewer on submission.id. */}
       <FeatureOverrideDialog
+        key={`${company.id}-${overrideOpen}`}
         company={company}
         open={overrideOpen}
         onOpenChange={setOverrideOpen}

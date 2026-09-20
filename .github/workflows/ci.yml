@@ -28,9 +28,17 @@ jobs:
       - name: Tests
         run: npm test
 
-      # Informational. Everything here is a warning today, mostly inherited
-      # react-compiler notes; failing the build on them would cost more than
-      # it catches.
+      # Informational, but no longer by much: 6 warnings, all inherited
+      # react-compiler notes (fast-refresh export shapes, one set-state-in-
+      # effect in ConfirmDialog, one incompatible-library on TanStack Table).
+      #
+      # The rule that matters already gates without this step:
+      # react/exhaustive-effect-dependencies is "error" in .oxlintrc.json, and
+      # oxlint exits non-zero on an error. It was added the day it caught the
+      # sidebar drawer closing itself on the render that opened it -- the
+      # console was unusable on a phone and nothing in CI noticed.
+      #
+      # Clear the six and this step can drop continue-on-error too.
       - name: Lint
         run: npm run lint
         continue-on-error: true
