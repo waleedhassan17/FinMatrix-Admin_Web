@@ -105,8 +105,10 @@ describe('rupee to paisa', () => {
 
   it('rounds a fractional amount rather than truncating a float', async () => {
     renderDialog();
-    // 2500.1 * 100 is 250009.99999999997 in IEEE 754. Truncating that charges
-    // a paisa less than the page showed.
+    // The hazard is values whose product lands a hair SHORT of the integer --
+    // 0.29 * 100 is 28.999999999999996, 8.29 * 100 is 828.9999999999999 -- where
+    // truncating loses a paisa. Math.round covers those; this asserts a
+    // fractional input survives the trip at all.
     fireEvent.change(monthlyField(), { target: { value: '2500.1' } });
     fireEvent.click(save());
 

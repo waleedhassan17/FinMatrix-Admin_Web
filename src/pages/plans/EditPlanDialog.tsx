@@ -30,9 +30,14 @@ import { resetPlan, updatePlan } from '@/networks/superAdmin/platformNetwork';
 /**
  * Rupees in the field, paisa on the wire.
  *
- * Math.round is the whole point: 2500.1 typed into a rupee field is 250010
- * paisa, and a float multiplication gives 250009.99999999997. Truncating that
- * charges a customer a paisa less than the page showed them.
+ * Math.round is the whole point. Rupee amounts whose product lands a hair
+ * short of the integer -- 0.29 * 100 is 28.999999999999996, 8.29 * 100 is
+ * 828.9999999999999 -- would lose a paisa to truncation or a bitwise `| 0`.
+ *
+ * Known limit, accepted: a half-paisa cannot be resolved. 1.005 * 100 is
+ * 100.49999999999999, so this yields 100 rather than the 101 a human would
+ * write. Prices here are whole rupees, so the case does not arise; see
+ * planMoney.test.ts in the app for the same note.
  */
 const toPaisa = (rupees: string): number =>
   Math.round(Number(rupees.replace(/,/g, '')) * 100);
