@@ -88,7 +88,7 @@ export function PlansPage() {
 
         <TabsContent value="subscriptions">
           <div className="pt-md">
-            <SubscriptionsPanel plans={plans} />
+            <SubscriptionsPanel />
           </div>
         </TabsContent>
       </Tabs>

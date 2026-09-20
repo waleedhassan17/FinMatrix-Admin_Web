@@ -8,41 +8,46 @@
 // twice, and a console with six destinations is easier to hold than one with
 // seven.
 //
-// The caveat in the banner is not decoration. This endpoint writes the legacy
-// company_subscriptions table, which is DECOUPLED from the
-// companies.subscription_plan columns the server actually gates access on.
-// Assigning here does not activate anyone, and an operator who assumes it does
-// will leave a paying customer locked out.
+// READ-ONLY, and that is not a simplification -- assignment cannot currently
+// be done correctly from here. There are two disjoint plan universes on the
+// server:
+//
+//   plan-config.ts      warehouse/small_business/large_org tiers, priced in
+//                       PKR, ids like 'warehouse_starter_6mo'. This is what
+//                       the catalogue lists, what a customer is charged on
+//                       submit, and what deliveryPersonnelLimit comes from.
+//
+//   subscription_plans  a UUID-keyed table seeded with Free / Starter /
+//                       Professional / Enterprise at $0 / $29 / $290 -- an
+//                       earlier design, in the wrong currency, that nothing
+//                       customer-facing reads.
+//
+// POST /super-admin/subscriptions resolves dto.planId against the TABLE.
+// Feeding it a catalogue id fails outright; feeding it a table id assigns a
+// company to a dollar-priced plan FinMatrix does not sell. And the row it
+// writes is decoupled from companies.subscription_plan, which is what
+// actually gates access, so even a successful write changes nothing a
+// customer experiences.
+//
+// The list below is real -- these are rows that exist -- so it stays. The
+// assign action is gone until the server has one plan universe.
 
 import { useState } from 'react';
-import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
-import { toast } from 'sonner';
+
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 
 import { ErrorBanner } from '@/components/layout/PageState';
-import { Button } from '@/components/ui/Button';
 import { DataTable, TablePager } from '@/components/ui/DataTable';
-import { Dialog } from '@/components/ui/Dialog';
-import { DateField, Textarea } from '@/components/ui/Field';
-import { Select } from '@/components/ui/Select';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { useSettle } from '@/features/platform/invalidation';
-import type {
-  CompanySubscription,
-  SubscriptionPlan,
-} from '@/models/platform';
-import {
-  assignSubscription,
-  getCompanies,
-  listSubscriptions,
-} from '@/networks/superAdmin/platformNetwork';
+import type { CompanySubscription } from '@/models/platform';
+import { listSubscriptions } from '@/networks/superAdmin/platformNetwork';
 import { formatDate } from '@/utils/date';
 
 const PAGE_SIZE = 20;
 
-export function SubscriptionsPanel({ plans }: { plans: SubscriptionPlan[] }) {
+export function SubscriptionsPanel() {
   const [page, setPage] = useState(1);
-  const [assignOpen, setAssignOpen] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['subscriptions', 'list', { page }],
@@ -104,10 +109,11 @@ export function SubscriptionsPanel({ plans }: { plans: SubscriptionPlan[] }) {
           aria-hidden="true"
         />
         <p className="text-body-sm text-text-secondary">
-          Assigning a subscription here records it against the company, but it
-          does <strong>not</strong> by itself activate that company or extend
-          its access — those are driven by the payment flow. Use this for
-          corrections and manual arrangements, then check the company record.
+          Read-only. These rows record what was assigned historically, but the
+          plans they point at live in a separate table from the catalogue above
+          and from what the billing flow charges — so assigning from here
+          cannot currently produce a correct result. A company&rsquo;s real
+          plan is on its company record.
         </p>
       </div>
 
@@ -118,12 +124,6 @@ export function SubscriptionsPanel({ plans }: { plans: SubscriptionPlan[] }) {
           onRetry={refetch}
         />
       )}
-
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setAssignOpen(true)}>
-          Assign a plan
-        </Button>
-      </div>
 
       <div>
         <DataTable<CompanySubscription>
@@ -143,127 +143,7 @@ export function SubscriptionsPanel({ plans }: { plans: SubscriptionPlan[] }) {
           onPage={setPage}
         />
       </div>
-
-      <AssignSubscriptionDialog
-        plans={plans}
-        open={assignOpen}
-        onOpenChange={setAssignOpen}
-      />
     </div>
-  );
-}
-
-function AssignSubscriptionDialog({
-  plans,
-  open,
-  onOpenChange,
-}: {
-  plans: SubscriptionPlan[];
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { afterSubscriptionAssign } = useSettle();
-
-  const [companyId, setCompanyId] = useState('');
-  const [planId, setPlanId] = useState('');
-  const [startDate, setStartDate] = useState(
-    () => new Date().toISOString().slice(0, 10),
-  );
-  const [endDate, setEndDate] = useState('');
-  const [notes, setNotes] = useState('');
-
-  // There is no company search endpoint, so this is the first page of
-  // companies rather than a lookup. Enough for the correction-shaped work this
-  // screen is for; a picker that implied search would be lying.
-  const { data: companies } = useQuery({
-    queryKey: ['companies', 'list', { filter: 'all', page: 1 }],
-    queryFn: () => getCompanies({ page: 1, limit: 100 }),
-    enabled: open,
-  });
-
-  const assign = useMutation({
-    mutationFn: () =>
-      assignSubscription({
-        companyId,
-        planId,
-        startDate: new Date(startDate).toISOString(),
-        ...(endDate ? { endDate: new Date(endDate).toISOString() } : {}),
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-      }),
-    onSuccess: () => {
-      afterSubscriptionAssign();
-      toast.success('Subscription assigned');
-      onOpenChange(false);
-      setCompanyId('');
-      setPlanId('');
-      setNotes('');
-    },
-    onError: (e: Error) =>
-      toast.error('Could not assign the subscription', {
-        description: e.message,
-      }),
-  });
-
-  const ready = !!companyId && !!planId && !!startDate;
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Assign a plan"
-      description="Records a subscription against a company."
-      footer={
-        <>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            disabled={!ready || assign.isPending}
-            onClick={() => assign.mutate()}
-          >
-            {assign.isPending ? 'Assigning…' : 'Assign'}
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-md p-lg">
-        <Select
-          label="Company"
-          value={companyId}
-          onChange={setCompanyId}
-          placeholder="Choose a company"
-          options={(companies?.data ?? []).map((c) => ({
-            value: c.id,
-            label: c.name,
-          }))}
-        />
-        <Select
-          label="Plan"
-          value={planId}
-          onChange={setPlanId}
-          placeholder="Choose a plan"
-          options={plans.map((p) => ({ value: p.id, label: p.name }))}
-        />
-        <DateField
-          label="Starts"
-          value={startDate}
-          onChange={setStartDate}
-        />
-        <DateField
-          label="Ends"
-          value={endDate}
-          onChange={setEndDate}
-          hint="Optional. Leave blank for an open-ended arrangement."
-        />
-        <Textarea
-          label="Notes"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={2}
-          placeholder="Why this was assigned by hand"
-        />
-      </div>
-    </Dialog>
   );
 }
 
