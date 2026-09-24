@@ -10,8 +10,10 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ShieldCheck, X } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
+import { BILLING_DISABLED_BUILD } from '@/config/featureFlags';
 import { NAV_ITEMS } from '@/config/nav';
 import { cn } from '@/lib/cn';
+import { getPlatformStats } from '@/networks/superAdmin/platformNetwork';
 import { getPlatformRevenue } from '@/networks/superAdmin/submissionNetwork';
 import { SIDEBAR_GRADIENT } from '@/theme/tokens';
 
@@ -55,6 +57,19 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
     queryFn: getPlatformRevenue,
     refetchInterval: 60_000,
     select: (summary) => summary.pendingSubmissions,
+    // BILLING-DISABLED BUILD: there is no Payments page to badge.
+    enabled: !BILLING_DISABLED_BUILD,
+  });
+
+  // BILLING-DISABLED BUILD: the queue is companies awaiting approval. Same key
+  // as the dashboard's stats, so the two never disagree, and a decision moves
+  // the badge because afterCompanyDecision invalidates ['platform'].
+  const { data: pendingCompanies } = useQuery({
+    queryKey: ['platform', 'stats'],
+    queryFn: getPlatformStats,
+    refetchInterval: 60_000,
+    select: (stats) => stats.companies.pending,
+    enabled: BILLING_DISABLED_BUILD,
   });
 
   return (
@@ -112,7 +127,12 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
           <ul className="space-y-[2px]">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
-              const count = item.badge === 'submissions' ? (waiting ?? 0) : 0;
+              const count =
+                item.badge === 'submissions'
+                  ? (waiting ?? 0)
+                  : item.badge === 'pendingCompanies'
+                    ? (pendingCompanies ?? 0)
+                    : 0;
               return (
                 <li key={item.path}>
                   <NavLink

@@ -23,6 +23,8 @@ import { describe, expect, it, vi } from 'vitest';
 import authReducer from '@/store/authSlice';
 
 import { AppLayout } from '../AppLayout';
+import { BILLING_DISABLED_BUILD } from '@/config/featureFlags';
+import { NAV_ITEMS } from '@/config/nav';
 
 // The Sidebar badge reads pendingSubmissions off the revenue summary. Nothing
 // here is about the badge, and an unmocked call would hit the network.
@@ -90,15 +92,22 @@ describe('AppLayout mobile drawer', () => {
   it('renders every nav item, because this is the only nav on a phone', () => {
     renderLayout();
 
-    for (const title of [
-      'Dashboard',
-      'Companies',
-      'Payments',
-      'Analytics',
-      'Plans',
-      'Settings',
-    ]) {
-      expect(screen.getByRole('link', { name: new RegExp(title, 'i') })).toBeInTheDocument();
+    for (const item of NAV_ITEMS) {
+      expect(
+        screen.getByRole('link', { name: new RegExp(item.title, 'i') }),
+      ).toBeInTheDocument();
     }
+  });
+
+  // BILLING-DISABLED BUILD: the plan pages have nothing to show.
+  it.runIf(BILLING_DISABLED_BUILD)('leaves out the plan pages while billing is off', () => {
+    renderLayout();
+
+    for (const title of ['Payments', 'Analytics', 'Plans']) {
+      expect(
+        screen.queryByRole('link', { name: new RegExp(title, 'i') }),
+      ).not.toBeInTheDocument();
+    }
+    expect(NAV_ITEMS.map((i) => i.title)).toEqual(['Dashboard', 'Companies', 'Settings']);
   });
 });

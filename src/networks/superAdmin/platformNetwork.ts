@@ -105,6 +105,11 @@ export interface CompanyQueryParams {
   status?: string;
   /** Omit for "all". Serialised as the strings 'true'/'false'. */
   isTrial?: boolean;
+  /**
+   * Company name or email, or the owner's name or email. Matched as "contains",
+   * case-insensitively; the server escapes wildcards.
+   */
+  search?: string;
 }
 
 export const getCompanies = async (

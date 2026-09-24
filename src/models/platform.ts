@@ -25,6 +25,9 @@ export interface PlatformStats {
     email: string | null;
     status: string;
     createdAt: string;
+    /** Who registered it. Optional: a server predating the field omits it. */
+    ownerName?: string | null;
+    ownerEmail?: string | null;
   }[];
 }
 
@@ -45,6 +48,22 @@ export interface CompanyListItem {
   isTrial: boolean;
   trialStartedAt: string | null;
   trialConvertedAt: string | null;
+  // The owner — who an administrator actually calls about a company. Optional
+  // so a server that predates them still type-checks; the UI falls back to the
+  // company's own email.
+  ownerName?: string | null;
+  ownerEmail?: string | null;
+  ownerPhone?: string | null;
+  ownerEmailVerified?: boolean | null;
+}
+
+/** The person who registered the company (its `createdBy`). */
+export interface CompanyOwner {
+  id: string;
+  displayName: string | null;
+  email: string | null;
+  phone: string | null;
+  isEmailVerified: boolean;
 }
 
 export type CompanyType = 'small_business' | 'large_org' | 'warehouse';
@@ -105,6 +124,8 @@ export interface CompanyDetail {
   trialConvertedAt: string | null;
   members: CompanyMember[];
   subscriptions: CompanySubscription[];
+  /** Absent from a server that predates it. */
+  owner?: CompanyOwner | null;
 }
 
 /** What PATCH /super-admin/companies/:id/status actually returns. */
@@ -225,11 +246,13 @@ export interface PaginatedList<T> {
  * The statuses the Companies filter offers. `all` is a client-side concept —
  * it means "send no status param" — which is why it is separated below.
  */
+// Labelled for the decision, not the database value: "Awaiting approval" is
+// the queue to work, "Deactivated" is what an administrator did to it.
 export const COMPANY_FILTERS = [
   { label: 'All', value: 'all' },
-  { label: 'Pending', value: 'pending' },
+  { label: 'Awaiting approval', value: 'pending' },
   { label: 'Active', value: 'active' },
-  { label: 'Inactive', value: 'inactive' },
+  { label: 'Deactivated', value: 'inactive' },
   { label: 'Rejected', value: 'rejected' },
 ] as const;
 
@@ -269,6 +292,44 @@ export const trialParamFor = (filter: TrialFilter): boolean | undefined =>
  */
 export const normalizeCompanyStatus = (status: string | null | undefined): string =>
   status === 'suspended' ? 'inactive' : status === 'approved' ? 'active' : (status ?? 'pending');
+
+/**
+ * What a company is waiting on, for deciding what can be done to it.
+ *
+ * A company that was created but never submitted (`email_verified`, `draft`,
+ * `unverified`) sits in the same queue as a submitted one — the server's
+ * "pending" filter includes it — and it needs the same decision. It used to
+ * fall through every check and be offered "Reactivate".
+ */
+export type CompanyStage = 'pending' | 'active' | 'inactive' | 'rejected';
+
+export const companyStage = (status: string | null | undefined): CompanyStage => {
+  const s = normalizeCompanyStatus(status);
+  if (s === 'active' || s === 'inactive' || s === 'rejected') return s;
+  return 'pending';
+};
+
+/** A never-submitted company: in the queue, but the owner did not finish. */
+export const isUnsubmitted = (status: string | null | undefined): boolean =>
+  status === 'email_verified' || status === 'draft' || status === 'unverified';
+
+/**
+ * The badge wording for a company status. The database words ("inactive",
+ * "email_verified") are not what an administrator did or is being asked to do.
+ */
+export const companyStatusLabel = (status: string | null | undefined): string => {
+  if (isUnsubmitted(status)) return 'Not submitted';
+  switch (companyStage(status)) {
+    case 'active':
+      return 'Active';
+    case 'inactive':
+      return 'Deactivated';
+    case 'rejected':
+      return 'Rejected';
+    default:
+      return 'Awaiting approval';
+  }
+};
 
 /**
  * The canned rejection reasons, carried over verbatim from the app. A reviewer

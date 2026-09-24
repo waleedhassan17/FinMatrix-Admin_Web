@@ -7,6 +7,7 @@ import {
 } from 'react-router-dom';
 
 import { Button } from '@/components/ui/Button';
+import { BILLING_DISABLED_BUILD } from '@/config/featureFlags';
 import {
   RedirectIfAuthenticated,
   RequireSuperAdmin,
@@ -98,9 +99,21 @@ export const router = createBrowserRouter([
           { path: 'dashboard', element: <DashboardPage /> },
           { path: 'companies', element: <CompaniesPage /> },
           { path: 'companies/:id', element: <CompanyDetailPage /> },
-          { path: 'payments', element: <PaymentsPage /> },
-          { path: 'analytics', element: <AnalyticsPage /> },
-          { path: 'plans', element: <PlansPage /> },
+          // BILLING-DISABLED BUILD: the plan pages are routed away rather
+          // than deleted — a bookmark lands on the dashboard, and flipping
+          // the flag brings every page back untouched.
+          {
+            path: 'payments',
+            element: BILLING_DISABLED_BUILD ? <Navigate to="/dashboard" replace /> : <PaymentsPage />,
+          },
+          {
+            path: 'analytics',
+            element: BILLING_DISABLED_BUILD ? <Navigate to="/dashboard" replace /> : <AnalyticsPage />,
+          },
+          {
+            path: 'plans',
+            element: BILLING_DISABLED_BUILD ? <Navigate to="/dashboard" replace /> : <PlansPage />,
+          },
           { path: 'settings', element: <SettingsPage /> },
           { path: '*', element: <NotFoundPage /> },
         ],
