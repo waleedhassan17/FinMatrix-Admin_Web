@@ -7,9 +7,10 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ShieldCheck, X } from 'lucide-react';
+import { ChevronLeft, X } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
+import { LogoMark } from '@/components/brand/LogoMark';
 import { BILLING_DISABLED_BUILD } from '@/config/featureFlags';
 import { NAV_ITEMS } from '@/config/nav';
 import { cn } from '@/lib/cn';
@@ -106,9 +107,7 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
       >
         <div className="flex h-16 items-center justify-between border-b border-white/10 px-md">
           <div className="flex min-w-0 items-center gap-sm">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/10">
-              <ShieldCheck className="size-5" aria-hidden="true" />
-            </span>
+            <LogoMark className="size-9" />
             {!collapsed && (
               <span className="truncate text-h4 text-white">FinMatrix Admin</span>
             )}

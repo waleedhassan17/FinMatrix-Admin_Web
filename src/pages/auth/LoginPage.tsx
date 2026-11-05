@@ -7,9 +7,9 @@
 
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { ShieldCheck } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
+import { LogoMark } from '@/components/brand/LogoMark';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { authLogin } from '@/networks/auth/authNetwork';
@@ -60,9 +60,7 @@ export function LoginPage() {
         style={{ background: 'var(--color-header)' }}
       >
         <div className="flex items-center gap-sm">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-white/10">
-            <ShieldCheck className="size-5" aria-hidden="true" />
-          </span>
+          <LogoMark className="size-9" />
           <span className="text-h4">FinMatrix Admin</span>
         </div>
         <div className="max-w-card">
@@ -79,10 +77,10 @@ export function LoginPage() {
 
       <div className="flex flex-1 items-center justify-center bg-background p-lg">
         <form onSubmit={submit} className="w-full max-w-form">
+          {/* Below lg the brand panel is hidden, so the mark stands here alone,
+              in the logo's own ink on the light ground. */}
           <div className="mb-xl lg:hidden">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-primary-tint text-primary">
-              <ShieldCheck className="size-5" aria-hidden="true" />
-            </span>
+            <LogoMark className="size-10 text-brand-ink" />
           </div>
 
           <h2 className="text-h2 text-text-primary">Sign in</h2>

@@ -1,8 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <rect width="32" height="32" rx="7" fill="#111D28"/>
-  <g fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round">
-    <path d="M10 22V14"/>
-    <path d="M16 22V10"/>
-    <path d="M22 22V17"/>
+<!--
+  FinMatrix Admin favicon: the logo, a rounded "m" over a red rule, in its
+  dark-ground treatment (white "m", red rule) on the console's header colour.
+
+  Dark tile on purpose: the customer site's favicon is the same mark on a light
+  tile, and an administrator often has both open. The tile colour is what tells
+  the two tabs apart.
+
+  Same geometry as src/components/brand/LogoMark.tsx. The hexes are inlined
+  because a file in public/ cannot import the theme: header #111d28, brand red
+  #b40d0d. Never write two hyphens in a row inside this comment (so no CSS
+  variable names): XML forbids it, and a browser then rejects the whole file.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="7" fill="#111d28" />
+  <g transform="translate(4.711 5.658) scale(0.22577)">
+    <path d="M10 62.36V30a20 20 0 0 1 40 0v32.36M50 30a20 20 0 0 1 40 0v32.36" stroke="#ffffff" stroke-width="20" stroke-linecap="round" />
+    <rect x="-3.86" y="79.25" width="107.72" height="12.36" rx="6.18" fill="#b40d0d" />
   </g>
 </svg>
