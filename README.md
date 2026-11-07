@@ -31,7 +31,7 @@ Port **5174**, not the website's 5173, so both can run at once.
 ```ts
 export const API_BASE_URL =
   import.meta.env.VITE_API_URL?.trim() ||
-  'https://finmatrix-api-prod-665c6b5cb6a1.herokuapp.com/api/v1';
+  'https://finmatrix-api.duckdns.org/api/v1';
 ```
 
 > **The default is production.** Approve and Reject on the Payments page settle
