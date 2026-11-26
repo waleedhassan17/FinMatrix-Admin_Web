@@ -55,6 +55,16 @@ export interface CompanyListItem {
   ownerEmail?: string | null;
   ownerPhone?: string | null;
   ownerEmailVerified?: boolean | null;
+  // Launch: the effective status, plan terms, the plan asked for, the demo
+  // flag and suspension. Optional, for a server that predates them.
+  accountStatus?: string;
+  subscriptionPlan?: string | null;
+  subscriptionPlanLabel?: string | null;
+  subscriptionExpiryDate?: string | null;
+  requestedPlan?: string | null;
+  isDemo?: boolean;
+  suspendedAt?: string | null;
+  suspensionReason?: string | null;
 }
 
 /** The person who registered the company (its `createdBy`). */
@@ -126,6 +136,14 @@ export interface CompanyDetail {
   subscriptions: CompanySubscription[];
   /** Absent from a server that predates it. */
   owner?: CompanyOwner | null;
+  // Launch (optional for an older server).
+  accountStatus?: string;
+  subscriptionPlanLabel?: string | null;
+  requestedPlan?: string | null;
+  approvalNote?: string | null;
+  isDemo?: boolean;
+  suspendedAt?: string | null;
+  suspensionReason?: string | null;
 }
 
 /** What PATCH /super-admin/companies/:id/status actually returns. */
