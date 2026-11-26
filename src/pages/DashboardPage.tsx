@@ -34,6 +34,7 @@ import {
 } from '@/models/platform';
 import { getCompanies, getPlatformStats } from '@/networks/superAdmin/platformNetwork';
 import { getPlatformRevenue } from '@/networks/superAdmin/submissionNetwork';
+import { getMigrationCounts, getTrialCounts, listDemoRequests } from '@/networks/superAdmin/launchAdminNetwork';
 import { formatDate } from '@/utils/date';
 
 /** How many waiting companies the dashboard lists before "View all". */
@@ -60,6 +61,14 @@ export function DashboardPage() {
   });
 
   // Only when payments are real: the revenue summary carries the count.
+  // Launch tiles: trials, the review queues, demo bookings, migrations.
+  const trials = useQuery({ queryKey: ['trials', 'counts'], queryFn: getTrialCounts });
+  const demos = useQuery({
+    queryKey: ['demos', 'list', { status: 'new', q: '', page: 1 }],
+    queryFn: () => listDemoRequests({ status: 'new', page: 1, limit: 25 }),
+  });
+  const migrations = useQuery({ queryKey: ['migrations', 'counts'], queryFn: getMigrationCounts });
+
   const revenue = useQuery({
     queryKey: ['revenue', 'summary'],
     queryFn: getPlatformRevenue,
@@ -222,6 +231,48 @@ export function DashboardPage() {
             <ArrowRight className="size-4" aria-hidden="true" />
           </Link>
         )}
+      </Card>
+
+      {/* 2b ── Trials, demos and migrations ────────────────────────────── */}
+      <Card className="overflow-hidden" data-testid="launch-tiles">
+        <div className="grid grid-cols-2 gap-px bg-border-light sm:grid-cols-3 xl:grid-cols-6">
+          <CountCell to="/trials?view=active" label="Active trials" value={count(trials.data?.activeTrials)} loading={trials.isLoading} />
+          <CountCell
+            to="/trials?view=active"
+            label="Trials ending in 7 days"
+            value={count(trials.data?.trialsEndingIn7Days)}
+            tone={trials.data?.trialsEndingIn7Days ? 'warning' : 'default'}
+            loading={trials.isLoading}
+          />
+          <CountCell
+            to="/trials?view=held"
+            label="Held trials"
+            value={count(trials.data?.heldTrials)}
+            tone={trials.data?.heldTrials ? 'warning' : 'default'}
+            loading={trials.isLoading}
+          />
+          <CountCell
+            to="/trials?view=activations"
+            label="Activation requests"
+            value={count(trials.data?.activationRequests)}
+            tone={trials.data?.activationRequests ? 'warning' : 'default'}
+            loading={trials.isLoading}
+          />
+          <CountCell
+            to="/demo-requests?status=new"
+            label="New demo requests"
+            value={count(demos.data?.counts.new ?? 0)}
+            tone={demos.data?.counts.new ? 'warning' : 'default'}
+            loading={demos.isLoading}
+          />
+          <CountCell
+            to="/migrations?filter=stuck"
+            label="Migrations stuck"
+            value={count(migrations.data?.stuck)}
+            tone={migrations.data?.stuck ? 'warning' : 'default'}
+            loading={migrations.isLoading}
+          />
+        </div>
       </Card>
 
       {/* 3 ── Recent sign-ups ─────────────────────────────────────────── */}

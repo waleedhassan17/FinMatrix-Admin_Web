@@ -110,6 +110,8 @@ export interface CompanyQueryParams {
    * case-insensitively; the server escapes wildcards.
    */
   search?: string;
+  /** Demo/test companies only (true) or real ones only (false). */
+  isDemo?: boolean;
 }
 
 export const getCompanies = async (

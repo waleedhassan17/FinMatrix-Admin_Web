@@ -7,8 +7,10 @@
 import { companyStage } from '@/models/platform';
 
 /**
- * Each action and the status it sends. Deactivating sends `inactive`: the
- * server accepts `suspended` as a synonym but stores `inactive`.
+ * Each action and its toast. Since launch: approving needs a plan and an end
+ * date (or a trial); deactivating is a suspension with a reason (every
+ * session ends at once); activating reinstates a suspended company or puts
+ * an expired one back on a plan.
  */
 export const DECISIONS = {
   approve: { status: 'active', toast: 'Company approved' },
@@ -24,6 +26,10 @@ export interface DecidableCompany {
   id: string;
   name: string;
   status: string;
+  /** Set while FinMatrix has the company suspended. */
+  suspendedAt?: string | null;
+  /** The plan the owner asked for, pre-selected when approving. */
+  requestedPlan?: string | null;
 }
 
 /**

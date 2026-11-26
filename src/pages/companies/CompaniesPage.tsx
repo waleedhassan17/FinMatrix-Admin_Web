@@ -9,12 +9,17 @@
 // a link the dashboard can point at and a reviewer can bookmark.
 
 import { useEffect, useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ErrorBanner } from '@/components/layout/PageState';
+import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Textarea } from '@/components/ui/Field';
+import { Input } from '@/components/ui/Input';
 import { DataTable, TablePager } from '@/components/ui/DataTable';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -34,6 +39,8 @@ import {
   type CompanyListItem,
   type TrialFilter,
 } from '@/models/platform';
+import { bulkDeleteAllowed } from '@/models/launchAdmin';
+import { bulkCompanies } from '@/networks/superAdmin/launchAdminNetwork';
 import { getCompanies } from '@/networks/superAdmin/platformNetwork';
 import { formatDate } from '@/utils/date';
 
@@ -55,6 +62,13 @@ export function CompaniesPage() {
     !BILLING_DISABLED_BUILD && isTrialFilter(rawTrial) ? rawTrial : 'all';
   const q = params.get('q') ?? '';
   const page = Math.max(1, Number(params.get('page') ?? 1) || 1);
+  // Demo/test companies: all, only them (bulk work), or real customers only.
+  const demo = (['only', 'hide'] as const).find((d) => d === params.get('demo')) ?? 'all';
+  const queryClient = useQueryClient();
+  const [selected, setSelected] = useState<Record<string, CompanyListItem>>({});
+  const [bulk, setBulk] = useState<'suspend' | 'delete' | null>(null);
+  const [bulkReason, setBulkReason] = useState('');
+  const [bulkTyped, setBulkTyped] = useState('');
 
   // Every change resets to page 1: page 3 of "all" is rarely page 3 of a
   // search, and landing on an empty page reads as "nothing here".
@@ -65,8 +79,17 @@ export function CompaniesPage() {
     if (f !== 'all') out.filter = f;
     if (t !== 'all') out.trial = t;
     if (q) out.q = q;
+    if (demo !== 'all') out.demo = demo;
     if (next.page && next.page > 1) out.page = String(next.page);
     setParams(out);
+  };
+  const setDemo = (d: 'all' | 'only' | 'hide') => {
+    const out = new URLSearchParams(params);
+    if (d === 'all') out.delete('demo');
+    else out.set('demo', d);
+    out.delete('page');
+    setParams(out);
+    setSelected({});
   };
 
   // The field updates on every keystroke; the URL (and the request) follows
@@ -91,7 +114,7 @@ export function CompaniesPage() {
   }, [text, q, setParams]);
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
-    queryKey: ['companies', 'list', { filter, trial, q, page }],
+    queryKey: ['companies', 'list', { filter, trial, q, page, demo }],
     queryFn: () =>
       getCompanies({
         page,
@@ -99,6 +122,7 @@ export function CompaniesPage() {
         status: statusParamFor(filter),
         isTrial: trialParamFor(trial),
         search: q || undefined,
+        isDemo: demo === 'only' ? true : demo === 'hide' ? false : undefined,
       }),
     // Keeps the current page on screen while the next one loads, so the table
     // does not collapse to a skeleton on every pager click.
@@ -111,7 +135,44 @@ export function CompaniesPage() {
   // or a changed server-side limit cannot drift the pager.
   const totalPages = data?.pages ?? Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  const selectedRows = Object.values(selected);
+  const toggle = (c: CompanyListItem) =>
+    setSelected((prev) => {
+      const next = { ...prev };
+      if (next[c.id]) delete next[c.id];
+      else next[c.id] = c;
+      return next;
+    });
+
+  const runBulk = useMutation({
+    mutationFn: () =>
+      bulkCompanies({ action: bulk!, ids: selectedRows.map((c) => c.id), reason: bulkReason.trim() }),
+    onSuccess: () => {
+      toast.success(bulk === 'delete' ? `Deleting ${selectedRows.length} companies` : `${selectedRows.length} companies suspended`);
+      void queryClient.invalidateQueries({ queryKey: ['companies'] });
+      void queryClient.invalidateQueries({ queryKey: ['platform'] });
+      setSelected({});
+      setBulk(null);
+      setBulkReason('');
+      setBulkTyped('');
+    },
+    onError: (e: Error) => toast.error('The bulk action failed', { description: e.message }),
+  });
+
   const columns = [
+    {
+      header: '',
+      id: 'select',
+      cell: ({ row }: Row) => (
+        <input
+          type="checkbox"
+          aria-label={`Select ${row.original.name}`}
+          checked={!!selected[row.original.id]}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => toggle(row.original)}
+        />
+      ),
+    },
     {
       header: 'Company',
       accessorKey: 'name',
@@ -124,6 +185,7 @@ export function CompaniesPage() {
           >
             {row.original.name}
           </Link>
+          {row.original.isDemo && <StatusBadge status="draft" label="Demo" />}
           <p className="truncate text-body-sm text-text-secondary">
             {row.original.industry || row.original.phone || '—'}
           </p>
@@ -250,6 +312,43 @@ export function CompaniesPage() {
                   </Chip>
                 ))}
               </div>
+              <div className="flex flex-wrap items-center gap-xs">
+                <span className="text-label-sm text-text-tertiary">Demo/test</span>
+                {(
+                  [
+                    ['all', 'All'],
+                    ['only', 'Demo only'],
+                    ['hide', 'Real customers'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <Chip key={value} size="sm" active={demo === value} onClick={() => setDemo(value)}>
+                    {label}
+                  </Chip>
+                ))}
+              </div>
+              {selectedRows.length > 0 && (
+                <div className="flex flex-wrap items-center gap-sm rounded-md bg-background-alt p-sm" data-testid="bulk-bar">
+                  <span className="text-label-md text-text-primary">{selectedRows.length} selected</span>
+                  <Button size="sm" variant="secondary" onClick={() => setBulk('suspend')}>
+                    Suspend selected
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    disabled={!bulkDeleteAllowed(selectedRows)}
+                    title={bulkDeleteAllowed(selectedRows) ? undefined : 'Only companies flagged demo/test can be deleted in bulk'}
+                    onClick={() => setBulk('delete')}
+                  >
+                    Delete selected
+                  </Button>
+                  {!bulkDeleteAllowed(selectedRows) && (
+                    <span className="text-caption text-text-secondary">Bulk delete is only for demo/test companies.</span>
+                  )}
+                  <Button size="sm" variant="text" onClick={() => setSelected({})}>
+                    Clear
+                  </Button>
+                </div>
+              )}
               {!BILLING_DISABLED_BUILD && (
                 <div className="flex flex-wrap items-center gap-xs">
                   <span className="text-label-sm text-text-tertiary">Trial</span>
@@ -275,6 +374,42 @@ export function CompaniesPage() {
           onPage={(next) => setQuery({ page: next })}
         />
       </div>
+
+      <ConfirmDialog
+        open={bulk !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setBulk(null);
+            setBulkReason('');
+            setBulkTyped('');
+          }
+        }}
+        title={bulk === 'delete' ? `Delete ${selectedRows.length} demo companies?` : `Suspend ${selectedRows.length} companies?`}
+        description={
+          bulk === 'delete'
+            ? 'Permanent. Each is suspended, purged and recorded in Deleted accounts.'
+            : 'Every member is signed out at once. Nothing is deleted.'
+        }
+        confirmLabel={bulk === 'delete' ? 'Delete permanently' : 'Suspend'}
+        destructive
+        busy={runBulk.isPending}
+        confirmDisabled={
+          bulkReason.trim().length < 3 || (bulk === 'delete' && bulkTyped.trim() !== `DELETE ${selectedRows.length}`)
+        }
+        onConfirm={() => runBulk.mutate()}
+      >
+        <div className="flex flex-col gap-sm">
+          <Textarea label="Reason (audited)" rows={2} value={bulkReason} onChange={(e) => setBulkReason(e.target.value)} />
+          {bulk === 'delete' && (
+            <Input
+              label={`Type DELETE ${selectedRows.length} to confirm`}
+              value={bulkTyped}
+              onChange={(e) => setBulkTyped(e.target.value)}
+              autoComplete="off"
+            />
+          )}
+        </div>
+      </ConfirmDialog>
 
       {dialogs}
     </div>

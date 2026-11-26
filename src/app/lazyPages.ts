@@ -41,3 +41,8 @@ export const SettingsPage = lazyWithReload(
 export const NotFoundPage = lazyWithReload(
   () => import('@/pages/NotFoundPage'),
 );
+export const TrialsPage = lazyWithReload(() => import('@/pages/trials/TrialsPage'));
+export const DemoRequestsPage = lazyWithReload(() => import('@/pages/demos/DemoRequestsPage'));
+export const MigrationsPage = lazyWithReload(() => import('@/pages/migrations/MigrationsPage'));
+export const UsersPage = lazyWithReload(() => import('@/pages/users/UsersPage'));
+export const DeletedAccountsPage = lazyWithReload(() => import('@/pages/users/DeletedAccountsPage'));

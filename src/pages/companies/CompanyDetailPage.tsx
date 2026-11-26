@@ -24,6 +24,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { BILLING_DISABLED_BUILD } from '@/config/featureFlags';
 import { CompanyActions } from '@/features/companies/CompanyActions';
 import { useCompanyDecision } from '@/features/companies/useCompanyDecision';
+import { CompanyLaunchPanel } from '@/features/launch/CompanyLaunchPanel';
 import {
   companyStatusLabel,
   normalizeCompanyStatus,
@@ -72,7 +73,12 @@ export function CompanyDetailPage() {
       <PageHeader
         title={company.name}
         back={{ to: '/companies', label: 'All companies' }}
-        status={<StatusBadge status={status} label={companyStatusLabel(company.status)} />}
+        status={
+          <span className="flex items-center gap-xs">
+            <StatusBadge status={status} label={companyStatusLabel(company.status)} />
+            {company.isDemo && <StatusBadge status="draft" label="Demo" />}
+          </span>
+        }
         meta={[
           company.industry,
           `Registered ${formatDate(company.createdAt)}`,
@@ -256,6 +262,8 @@ export function CompanyDetailPage() {
           )}
         </Card>
       )}
+
+      <CompanyLaunchPanel company={company} />
 
       {/* Keyed on the record, so reopening it remounts with fresh initial
           state rather than re-seeding from an effect. Same pattern

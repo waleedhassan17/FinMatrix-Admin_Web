@@ -31,6 +31,16 @@ import { NAV_ITEMS } from '@/config/nav';
 vi.mock('@/networks/superAdmin/submissionNetwork', () => ({
   getPlatformRevenue: vi.fn().mockResolvedValue({ pendingSubmissions: 0 }),
 }));
+vi.mock('@/networks/superAdmin/launchAdminNetwork', () => ({
+  getTrialCounts: vi.fn().mockResolvedValue({
+    activeTrials: 0,
+    trialsEndingIn7Days: 0,
+    heldTrials: 1,
+    approvalRequests: 2,
+    activationRequests: 0,
+  }),
+  listDemoRequests: vi.fn().mockResolvedValue({ items: [], counts: { new: 3 }, pagination: { page: 1, limit: 25, total: 0, pages: 0 } }),
+}));
 
 function renderLayout() {
   const queryClient = new QueryClient({
@@ -108,6 +118,15 @@ describe('AppLayout mobile drawer', () => {
         screen.queryByRole('link', { name: new RegExp(title, 'i') }),
       ).not.toBeInTheDocument();
     }
-    expect(NAV_ITEMS.map((i) => i.title)).toEqual(['Dashboard', 'Companies', 'Settings']);
+    expect(NAV_ITEMS.map((i) => i.title)).toEqual([
+      'Dashboard',
+      'Companies',
+      'Trials & approvals',
+      'Demo requests',
+      'Migrations',
+      'Users',
+      'Deleted accounts',
+      'Settings',
+    ]);
   });
 });

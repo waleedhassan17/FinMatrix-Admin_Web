@@ -13,12 +13,17 @@
 
 import { BILLING_DISABLED_BUILD } from '@/config/featureFlags';
 import {
+  Archive,
   BarChart2,
   Briefcase,
+  CalendarClock,
   CheckSquare,
   CreditCard,
+  DatabaseZap,
+  Gift,
   LayoutGrid,
   Settings,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -27,7 +32,7 @@ export interface NavItem {
   path: string;
   icon: LucideIcon;
   /** Marks the queue whose waiting count is shown as a badge. */
-  badge?: 'submissions' | 'pendingCompanies';
+  badge?: 'submissions' | 'pendingCompanies' | 'trialQueue' | 'newDemos';
 }
 
 /** The pages that exist only to sell plans. See BILLING_DISABLED_BUILD. */
@@ -43,6 +48,12 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: Briefcase,
     ...(BILLING_DISABLED_BUILD ? { badge: 'pendingCompanies' as const } : {}),
   },
+  // Launch: held trials + approval + activation requests wait here.
+  { title: 'Trials & approvals', path: '/trials', icon: Gift, badge: 'trialQueue' },
+  { title: 'Demo requests', path: '/demo-requests', icon: CalendarClock, badge: 'newDemos' },
+  { title: 'Migrations', path: '/migrations', icon: DatabaseZap },
+  { title: 'Users', path: '/users', icon: Users },
+  { title: 'Deleted accounts', path: '/deleted-accounts', icon: Archive },
   { title: 'Payments', path: '/payments', icon: CheckSquare, badge: 'submissions' },
   { title: 'Analytics', path: '/analytics', icon: BarChart2 },
   { title: 'Plans', path: '/plans', icon: CreditCard },

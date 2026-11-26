@@ -28,6 +28,11 @@ import {
   PaymentsPage,
   PlansPage,
   SettingsPage,
+  TrialsPage,
+  DemoRequestsPage,
+  MigrationsPage,
+  UsersPage,
+  DeletedAccountsPage,
 } from './lazyPages';
 
 function RouteFallback() {
@@ -99,6 +104,11 @@ export const router = createBrowserRouter([
           { path: 'dashboard', element: <DashboardPage /> },
           { path: 'companies', element: <CompaniesPage /> },
           { path: 'companies/:id', element: <CompanyDetailPage /> },
+          { path: 'trials', element: <TrialsPage /> },
+          { path: 'demo-requests', element: <DemoRequestsPage /> },
+          { path: 'migrations', element: <MigrationsPage /> },
+          { path: 'users', element: <UsersPage /> },
+          { path: 'deleted-accounts', element: <DeletedAccountsPage /> },
           // BILLING-DISABLED BUILD: the plan pages are routed away rather
           // than deleted — a bookmark lands on the dashboard, and flipping
           // the flag brings every page back untouched.

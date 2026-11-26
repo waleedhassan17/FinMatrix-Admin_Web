@@ -15,6 +15,7 @@ import { BILLING_DISABLED_BUILD } from '@/config/featureFlags';
 import { NAV_ITEMS } from '@/config/nav';
 import { cn } from '@/lib/cn';
 import { getPlatformStats } from '@/networks/superAdmin/platformNetwork';
+import { getTrialCounts, listDemoRequests } from '@/networks/superAdmin/launchAdminNetwork';
 import { getPlatformRevenue } from '@/networks/superAdmin/submissionNetwork';
 import { SIDEBAR_GRADIENT } from '@/theme/tokens';
 
@@ -71,6 +72,21 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
     refetchInterval: 60_000,
     select: (stats) => stats.companies.pending,
     enabled: BILLING_DISABLED_BUILD,
+  });
+
+  // Launch queues: held trials + approval and activation requests, and new
+  // demo bookings. Same keys as the pages, so a decision moves the badge.
+  const { data: trialQueue } = useQuery({
+    queryKey: ['trials', 'counts'],
+    queryFn: getTrialCounts,
+    refetchInterval: 60_000,
+    select: (c) => c.heldTrials + c.approvalRequests + c.activationRequests,
+  });
+  const { data: newDemos } = useQuery({
+    queryKey: ['demos', 'list', { status: 'new', q: '', page: 1 }],
+    queryFn: () => listDemoRequests({ status: 'new', page: 1, limit: 25 }),
+    refetchInterval: 60_000,
+    select: (l) => l.counts.new ?? 0,
   });
 
   return (
@@ -131,7 +147,11 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
                   ? (waiting ?? 0)
                   : item.badge === 'pendingCompanies'
                     ? (pendingCompanies ?? 0)
-                    : 0;
+                    : item.badge === 'trialQueue'
+                      ? (trialQueue ?? 0)
+                      : item.badge === 'newDemos'
+                        ? (newDemos ?? 0)
+                        : 0;
               return (
                 <li key={item.path}>
                   <NavLink

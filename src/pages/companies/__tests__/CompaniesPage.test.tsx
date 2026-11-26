@@ -17,10 +17,22 @@ import type { CompanyListItem } from '@/models/platform';
 
 const getCompanies = vi.fn();
 const updateCompanyStatus = vi.fn();
+const suspendCompany = vi.fn();
+const reinstateCompany = vi.fn();
+const activateCompany = vi.fn();
+const approveCompany = vi.fn();
 
 vi.mock('@/networks/superAdmin/platformNetwork', () => ({
   getCompanies: (...a: unknown[]) => getCompanies(...a),
   updateCompanyStatus: (...a: unknown[]) => updateCompanyStatus(...a),
+}));
+vi.mock('@/networks/superAdmin/launchAdminNetwork', () => ({
+  suspendCompany: (...a: unknown[]) => suspendCompany(...a),
+  reinstateCompany: (...a: unknown[]) => reinstateCompany(...a),
+  activateCompany: (...a: unknown[]) => activateCompany(...a),
+  approveCompany: (...a: unknown[]) => approveCompany(...a),
+  bulkCompanies: vi.fn(),
+  getOfferedPlans: vi.fn().mockResolvedValue([{ key: 'warehouse_scale_1yr', label: 'Warehouse Scale — 1 year' }]),
 }));
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -70,6 +82,10 @@ beforeEach(() => {
   getCompanies.mockReset();
   updateCompanyStatus.mockReset();
   updateCompanyStatus.mockResolvedValue({ id: 'c1', status: 'active' });
+  for (const m of [suspendCompany, reinstateCompany, activateCompany, approveCompany]) {
+    m.mockReset();
+    m.mockResolvedValue({ id: 'c1' });
+  }
 });
 
 describe('row actions', () => {
@@ -91,34 +107,60 @@ describe('row actions', () => {
     expect(screen.getByText('Not submitted')).toBeInTheDocument();
   });
 
-  it('offers deactivate on an active company, and sends `inactive`', async () => {
+  it('deactivating is a suspension that needs a reason', async () => {
     renderPage([company({ status: 'active' })]);
 
     // Row action opens the confirm; the confirm is what actually mutates.
     fireEvent.click(await screen.findByRole('button', { name: 'Deactivate' }));
     const dialog = await screen.findByRole('alertdialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Deactivate' }));
+    const confirm = within(dialog).getByRole('button', { name: 'Deactivate' });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('Reason (sent to the owner)'), {
+      target: { value: 'Chargeback dispute' },
+    });
+    fireEvent.click(confirm);
 
-    await waitFor(() => expect(updateCompanyStatus).toHaveBeenCalled());
-    // The server accepts 'suspended' but STORES 'inactive'; sending the stored
-    // spelling keeps the filter chips and the badges agreeing with each other.
-    expect(updateCompanyStatus.mock.calls[0][1]).toBe('inactive');
+    await waitFor(() => expect(suspendCompany).toHaveBeenCalledWith('c1', 'Chargeback dispute'));
+    expect(updateCompanyStatus).not.toHaveBeenCalled();
   });
 
-  it('offers activate on a deactivated company, and sends `active`', async () => {
+  it('activating a deactivated company restores it (or applies new terms)', async () => {
     renderPage([company({ status: 'inactive' })]);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Activate' }));
-    const dialog = await screen.findByRole('alertdialog');
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText(/restore as it was/i)).toBeChecked();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Activate' }));
 
-    await waitFor(() => expect(updateCompanyStatus).toHaveBeenCalled());
-    expect(updateCompanyStatus.mock.calls[0][1]).toBe('active');
+    await waitFor(() => expect(activateCompany).toHaveBeenCalledWith('c1', {}));
     // The badge says what an administrator did, not the database word. (The
     // filter chip of the same name is a button, so it is not matched here.)
     expect(
       screen.getAllByText('Deactivated').some((el) => el.tagName === 'SPAN'),
     ).toBe(true);
+  });
+
+  it('activating a suspended company reinstates it', async () => {
+    renderPage([company({ status: 'suspended', suspendedAt: '2026-11-20T00:00:00.000Z' })]);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Activate' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Activate' }));
+
+    await waitFor(() => expect(reinstateCompany).toHaveBeenCalledWith('c1'));
+    expect(activateCompany).not.toHaveBeenCalled();
+  });
+
+  it('approving needs a plan with an end date, or a trial — never a bare approval', async () => {
+    renderPage([company({ status: 'pending', requestedPlan: 'warehouse_scale_1yr' })]);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByLabelText(/as a free trial/i));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+
+    await waitFor(() => expect(approveCompany).toHaveBeenCalledWith('c1', { asTrial: true }));
+    expect(updateCompanyStatus).not.toHaveBeenCalled();
   });
 
   it('offers approve on a rejected company, so a rejection can be reconsidered', async () => {
