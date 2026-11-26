@@ -182,7 +182,6 @@ export interface DemoRequest {
   businessType: string;
   teamSize: string | null;
   currentSystem: string | null;
-  language: 'en' | 'ur';
   preferredSlotAt: string | null;
   message: string | null;
   utm: Record<string, string> | null;

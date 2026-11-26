@@ -151,7 +151,6 @@ describe('Demo requests drawer', () => {
     businessType: 'retail',
     teamSize: null,
     currentSystem: 'tally',
-    language: 'ur' as const,
     preferredSlotAt: '2026-11-27T05:00:00.000Z',
     message: null,
     utm: { source: 'facebook' },

@@ -218,7 +218,6 @@ function DemoDrawer({ id, onClose }: { id: string; onClose: () => void }) {
               <div><dt className="text-text-secondary">Name</dt><dd>{d.fullName}</dd></div>
               <div><dt className="text-text-secondary">City · type</dt><dd>{d.city} · {d.businessType}</dd></div>
               <div><dt className="text-text-secondary">Team · system</dt><dd>{d.teamSize ?? '—'} · {d.currentSystem ?? '—'}</dd></div>
-              <div><dt className="text-text-secondary">Language</dt><dd>{d.language === 'ur' ? 'Urdu' : 'English'}</dd></div>
               <div><dt className="text-text-secondary">Asked for</dt><dd>{d.preferredSlotAt ? formatDateTime(d.preferredSlotAt) : '—'}</dd></div>
               <div><dt className="text-text-secondary">Scheduled</dt><dd>{d.scheduledAt ? formatDateTime(d.scheduledAt) : '—'}</dd></div>
               <div className="sm:col-span-2"><dt className="text-text-secondary">Message</dt><dd>{d.message ?? '—'}</dd></div>
